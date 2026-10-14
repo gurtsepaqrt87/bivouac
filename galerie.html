@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.12 : chercher "v5.12" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.13 : chercher "v5.13" (Ctrl+U, Ctrl+F).
+     v5.13 = PORTRAIT PANORAMABLE : miniatures portraits non recadrees
+     (etape1 v5.7, 600 x H), affichees pleine largeur dans le cadre fixe
+     avec defilement vertical a la petite main (enablePan).
      v5.12 = FIX chevron DEFINITIF : le fond orange est sur .selbox (la
      boite), le select devient transparent dedans - le chevron est dans
      le bouton par construction, aucun rendu natif ne peut l'exiler
@@ -20,8 +23,12 @@
   /* poignee de redimensionnement galerie <-> carte (glisse lateral) */
   #split{flex:0 0 10px;cursor:col-resize;background:#1c2230;border-left:1px solid #39445c;border-right:1px solid #39445c;touch-action:none}
   #split:hover,#split.on{background:#ff7a00}
-  #media{background:#000;display:flex;align-items:center;justify-content:center;flex:1;min-height:0;position:relative;touch-action:none}
+  #media{background:#000;display:flex;align-items:center;justify-content:center;flex:1;min-height:0;position:relative;touch-action:none;overflow:hidden}
   #media img,#media video{max-width:100%;max-height:100%;display:block}
+  /* v5.13 : photo PORTRAIT - affichee PLEINE LARGEUR dans le cadre
+     fixe (hauteur libre > cadre), defilement vertical a la petite main */
+  #media img.tall{max-height:none;width:100%;height:auto;position:absolute;top:0;left:0;cursor:grab;touch-action:none;user-select:none;-webkit-user-drag:none}
+  #media img.tall.drag{cursor:grabbing}
   #cap{padding:9px 12px;font-size:13px;color:#c8d2e0;border-top:1px solid #26304a}
   #cap .nm{font-weight:600;color:#eef2f8;margin-bottom:3px;word-wrap:break-word}
   #cap .dt{opacity:.75}
@@ -143,7 +150,7 @@
     <button id="btLayoutM" title="Affichage 2 fenêtres">⧉</button>
     <div id="zoom"><button id="zin" title="Zoom +">+</button><button id="zout" title="Zoom −">−</button></div>
     <div id="bar">
-      <a id="btMap" href="https://umap.openstreetmap.fr/fr/map/cyclo_1463865" target="_blank" title="Ouvrir la carte uMap">🗺 Carte uMap</a>
+      <a id="btMap" href="https://umap.openstreetmap.fr/fr/map/itineraire-velo_123456" target="_blank" title="Ouvrir la carte uMap">🗺 Carte uMap</a>
     </div>
   </div>
 </div>
@@ -390,6 +397,37 @@ function fitSideToMedia(el, isVideo) {
   setSideW(PHOTO_W);   // setSideW applique plafond 2/3 ecran + plancher 348
   render();
 }
+// v5.13 : photo PORTRAIT - defilement vertical dans le cadre fixe.
+// La miniature portrait fait 600 x H (H libre, ex. 800) : affichee
+// pleine largeur, elle depasse le cadre -> glissement vertical borne
+// (0 en haut, cadre-image en bas), petite main (cursor grab), depart
+// CENTRE. Pointeur souris ET doigt (pointer events + setPointerCapture).
+function enablePan(el) {
+  el.classList.add("tall");
+  const box = mediaEl;
+  let top = 0, y0 = null;
+  requestAnimationFrame(() => {
+    const max = Math.min(0, box.clientHeight - el.offsetHeight);
+    if (max === 0) { el.classList.remove("tall"); return; } // tient entier
+    top = max / 2; el.style.top = top + "px";               // centre
+  });
+  el.addEventListener("pointerdown", e => {
+    const max = Math.min(0, box.clientHeight - el.offsetHeight);
+    if (max === 0) return;
+    y0 = e.clientY - top; el.classList.add("drag");
+    el.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  el.addEventListener("pointermove", e => {
+    if (y0 === null) return;
+    const max = Math.min(0, box.clientHeight - el.offsetHeight);
+    top = Math.max(max, Math.min(0, e.clientY - y0));
+    el.style.top = top + "px";
+  });
+  const fin = () => { y0 = null; el.classList.remove("drag"); };
+  el.addEventListener("pointerup", fin);
+  el.addEventListener("pointercancel", fin);
+}
+
 function openGal(i) {
   if (!media.length) return;
   sel = Math.max(0, Math.min(media.length - 1, i));
@@ -406,6 +444,8 @@ function openGal(i) {
   } else {
     el = document.createElement("img");
     el.src = m.url; el.alt = "";
+    // v5.13 : portrait -> defilement vertical dans le cadre fixe
+    el.addEventListener("load", () => { if (el.naturalHeight > el.naturalWidth) enablePan(el); });
     fitSideToMedia(el, false);
   }
   mediaEl.appendChild(el);
@@ -691,3 +731,5 @@ load();
 </script>
 </body>
 </html>
+
+<!-- DOCUMENT FINAL - galerie v5.13 - deplacer ce fichier vers galerie.html - PORTRAIT PANORAMABLE (enablePan, img.tall, etape1 v5.7) -->
