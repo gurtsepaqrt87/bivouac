@@ -1,9 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.15.9 : chercher "v5.15" (Ctrl+U, Ctrl+F).
-     v5.15.9 = en 2F photo+ALTI (bouton ⛰ de l'entete), la fenetre
-     alti gagne ~1/3 de hauteur (bas d'ecran 45% -> 60%) : le bas
-     n'etant pas utilise par une carte, autant le donner au graphe.
+<!-- VERSION v5.15.10 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+     v5.15.10 = la DATE ALTI SUIT la date PHOTO : changer la journee
+     via le menu du haut passiverise l'ancienne date auto dans l'alti
+     et active la nouvelle (selection = puces cochees a la main U
+     date de la photo affichee) ; les puces cochees manuellement ne
+     sont JAMAIS desactivees automatiquement.
+     v5.15.9 = en 2F photo+ALTI, fenetre alti 60% de hauteur.
      v5.15.8 = poignee ⌄ des dates alti : affichage 4 s (2500 ms
      avant : trop court pour cocher plusieurs dates).
      v5.15.7 = temporisations 1 s (barre du haut ET puces dates de
@@ -638,8 +641,8 @@ function openGal(i) {
   // zone admin : pre-remplir le champ commentaire si mode admin
   if (ADM) { document.getElementById("admTxt").value = m.commentaire || ""; }
   // le menu Date suit le media affiche
-  if (profilOn) { profilCursor(); chipsFlash(); } // v5.14 curseur + v5.15.6 puces flash
-  barFlash();                                    // v5.15.6 : barre flottante 0,5 s
+  if (profilOn) { syncPrDates(); drawProfil(); chipsFlash(); } // v5.15.10 : la date alti suit la photo
+  barFlash();                                   // v5.15.6 : barre flottante
   const dSel = document.getElementById("btDate");
   if (dSel.value !== m.date) dSel.value = m.date;
   applySel();
@@ -845,6 +848,16 @@ document.getElementById("btDate").addEventListener("change", e => {
 // de la photo affichee (nom de fichier horodate), clic inverse :
 // cliquer le profil ouvre la photo la plus proche de cet horodatage.
 let profilData = null, profilOn = false, prDates = new Set(), prMap = null;
+// v5.15.10 : la date alti SUIST la date photo : la selection affichee
+// = dates cochees MANUELLEMENT (puces) U la date de la photo affichee.
+// Changer la date via le menu du haut passiverise l'ancienne date auto
+// et active la nouvelle ; les puces cochees a la main restent.
+let prManual = new Set();
+function syncPrDates() {
+  const auto = media[sel] ? media[sel].date : null;
+  prDates = new Set(prManual);
+  if (auto) prDates.add(auto);
+}
 const NSVG = "http://www.w3.org/2000/svg";
 function photoEpoch(m) {
   // v5.14.2 : heure LOCALE du navigateur (meme fuseau que l'appareil
@@ -878,11 +891,12 @@ async function openProfil() {
     for (const d of Object.keys(profilData.dates).sort()) {
       const c = document.createElement("span");
       c.className = "prChip"; c.textContent = d;
-      c.onclick = () => { prDates.has(d) ? prDates.delete(d) : prDates.add(d); drawProfil(); };
+      c.onclick = () => { prManual.has(d) ? prManual.delete(d) : prManual.add(d);
+                           syncPrDates(); drawProfil(); };
       chips.appendChild(c);
     }
   }
-  if (!prDates.size && media[sel]) prDates.add(media[sel].date);
+  syncPrDates();                      // v5.15.10 : manuelles + date photo
   drawProfil();
 }
 function closeProfil() {
