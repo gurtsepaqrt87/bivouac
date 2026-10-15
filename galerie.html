@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.13 : chercher "v5.13" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.13.2 : chercher "v5.13" (Ctrl+U, Ctrl+F).
      v5.13 = PORTRAIT PANORAMABLE : miniatures portraits non recadrees
      (etape1 v5.7, 600 x H), affichees pleine largeur dans le cadre fixe
      avec defilement vertical a la petite main (enablePan).
@@ -119,6 +119,11 @@
     #admBox button{height:38px;font-size:14px}
     /* boutons d'entete photo (mobile seulement) : bascule carte + layout */
     #hdFlip,#hdLayout{display:flex;flex:0 0 40px;height:40px;font-size:17px;align-items:center;justify-content:center}
+    /* v5.13.2 : en mode 2 FENETRES (non .single), le bouton carte (hdFlip)
+       est INUTILE - showmap n'agit qu'en monofenetre (bug constate : il
+       ne faisait RIEN en 2 fenetres) : on le MASQUE. Il revient en
+       monofenetre, ou il bascule galerie -> carte. */
+    #wrap:not(.single) #hdFlip{display:none}
     /* bouton layout 2-fenetres, sur la carte (mobile seulement) */
     #btLayoutM{display:flex;position:absolute;left:64px;bottom:14px;z-index:1001;width:46px;height:46px;border-radius:12px;border:2px solid #b35300;background:#ff7a00cc;color:#fff;font-size:18px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
     #btLayoutM:hover{background:#ffa040}
@@ -592,7 +597,9 @@ document.getElementById("admSave").onclick = async () => {
 // Photo OU carte, bascule par glisse VERTICAL sur l'un des deux panneaux.
 // Le glisse horizontal sur la photo reste la navigation precedente/suivant.
 const wrapEl = document.getElementById("wrap");
-let layout2 = false;   // preference mobile : true = forcer 2 fenetres
+let layout2 = true;   // v5.13.2 : preference mobile - DOUBLE FENETRE par
+                      // defaut (galerie + carte des l'ouverture) ; l'uti-
+                      // lisateur peut basculer en simple via ⧉
 function applyLayout() {
   // monofenetre si ecran tres etroit ET pas de preference 2-fenetres
   wrapEl.classList.toggle("single", MOBILE && innerWidth <= 520 && !layout2);
@@ -751,4 +758,4 @@ load();
 </body>
 </html>
 
-<!-- DOCUMENT FINAL - galerie v5.13 - deplacer ce fichier vers galerie.html - PORTRAIT PANORAMABLE (enablePan, img.tall, etape1 v5.7) -->
+<!-- DOCUMENT FINAL - galerie v5.13.2 - deplacer ce fichier vers galerie.html - PORTRAIT PANORAMABLE (enablePan, img.tall, etape1 v5.7) -->
