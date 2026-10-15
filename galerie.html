@@ -1,14 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.15.6 : chercher "v5.15" (Ctrl+U, Ctrl+F).
-     v5.15.6 = FLASH 0,5 s GENERALISE : (1) barre du haut flottante
-     en 2 fenetres - mode normal ET "3 fenetres" - apparait 0,5 s a
-     chaque changement de photo (poignee ⌄ : rappel 2,5 s ; chargement
-     initial : 1,5 s) ; (2) puces de DATES de l'alti flottantes aussi
-     (0,5 s par-dessus le haut du graphe a chaque photo) -> le graphe
-     garde toute sa hauteur ; (3) apres fermeture de l'alti (✕), la
-     barre flottante est CONSERVEE en 2 fenetres normal : la hauteur
-     photo+carte reste optimisee.
+<!-- VERSION v5.15.7 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+     v5.15.7 = temporisations 1 s (barre du haut ET puces dates de
+     l'alti, rappel poignee = 2,5 s) ; poignee ⌄ AJOUTEE dans la
+     fenetre altimetrie pour selectionner les dates ; poignee de la
+     barre du haut DEPLACEE vers le haut de la PHOTO (avant : carte).
+     v5.15.6 = barre flottante en 2F (normal + 3 fenetres), puces
+     flottantes sur l'alti, photo conservee apres fermeture ✕.
      v5.15.5 = la PHOTO RESTE AFFICHEE en mode "3 fenetres".
      v5.15.4 = barre temporaire + bouton ✕ + alti 40%.
      v5.15.3 = MODE "3 FENETRES" (2F photo+carte + ⛰ de la carte) :
@@ -199,7 +197,16 @@
        hauteur photo+carte est optimisee. Poignee ⌄ pour la rappeler. */
     #wrap:not(.single) #side .sh{position:absolute;top:0;left:0;right:0;z-index:1500;background:#11151dcc;backdrop-filter:blur(4px);border-bottom:1px solid #39445c;opacity:0;pointer-events:none;transition:opacity .3s}
     #wrap:not(.single) #side .sh.show{opacity:1;pointer-events:auto}
-    #wrap:not(.single):not(.baron) #shHandle{display:flex;position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:1501;height:26px;padding:0 14px;border-radius:0 0 10px 10px;border:1px solid #b35300;border-top:none;background:#ff7a00cc;color:#fff;font-size:14px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
+    /* v5.15.7 : poignee ⌄ des DATES de l'alti - meme principe que
+       celle de la barre du haut (visible quand les puces sont
+       cachees, rappel 2,5 s par clic) */
+    #prHandle{display:none}
+    #profil.on:not(.chipsbar) #prHandle{display:flex}
+    /* v5.15.7 : poignee ⌄ de la barre du haut, positionnee au-dessus
+       de la PHOTO (avant : haut de la carte) - c'est la que l'oeil
+       cherche la navigation */
+    #side{position:relative}
+    #wrap:not(.single):not(.baron) #shHandle{display:flex}
     /* v5.15.6 : puces de DATES de l'alti = aussi FLOTTANTES (par-dessus
        le haut du graphe, 0,5 s a chaque changement de photo) - le
        graphe garde toute sa hauteur, plus de troncature */
@@ -209,6 +216,8 @@
     #prClose{display:none}
     #wrap.p3 #prClose{display:flex;position:absolute;top:6px;right:8px;z-index:1600;width:36px;height:36px;border-radius:10px;border:2px solid #b35300;background:#ff7a00;color:#fff;font-size:17px;font-weight:700;align-items:center;justify-content:center;cursor:pointer}
     #wrap.p3 #profil{height:40%}
+    /* styles communs des poignees ⌄ (barre du haut, puces alti) */
+    #shHandle,#prHandle{position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:1501;height:26px;padding:0 14px;border-radius:0 0 10px 10px;border:1px solid #b35300;border-top:none;background:#ff7a00cc;color:#fff;font-size:14px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
     /* l'URL/nom de fichier n'apporte rien sur mobile : date deja dans
        le menu, le commentaire reste (bloc #cmt) */
     #cap .nm,#cap .dt{display:none}
@@ -265,6 +274,7 @@
       <textarea id="admTxt" placeholder="Commentaire (publié dans photos.csv)…"></textarea>
       <button class="nav" id="admSave">💾 Enregistrer</button>
     </div>
+    <button id="shHandle" title="Afficher la barre de navigation">⌄</button>
   </aside>
   <div id="split" title="Glisser pour ajuster la largeur galerie / carte"></div>
   <!-- partie 2 : carte -->
@@ -272,10 +282,10 @@
     <div id="map"><div id="world"></div></div>
     <button id="btFlip" title="Revenir à la photo">⇅</button>
     <button id="btLayoutM" title="Affichage 2 fenêtres">⧉</button>
-  <button id="shHandle" title="Afficher la barre de navigation">⌄</button>
     <div id="zoom"><button id="zin" title="Zoom +">+</button><button id="zout" title="Zoom −">−</button><button id="btProfil" title="Profil altimétrique">⛰</button></div>
     <div id="profil">
       <button id="prClose" title="Fermer l'altimétrie">✕</button>
+      <button id="prHandle" title="Afficher les dates">⌄</button>
       <div id="prChips"></div>
       <div id="prWrap"><svg id="prSvg"></svg></div>
     </div>
@@ -875,10 +885,10 @@ function closeProfil() {
   document.getElementById("profil").classList.remove("on");
   document.getElementById("btProfil").classList.remove("on");
 }
-// v5.15.6 : barre du haut FLOTTANTE en 2 fenetres (mode normal et "3
-// fenetres") - apparait 0,5 s (dur ajustable) a chaque changement de
-// photo, poignee ⌄ pour la rappeler. Puces de dates de l'alti : meme
-// principe (0,5 s par-dessus le haut du graphe).
+// v5.15.7 : barre du haut FLOTTANTE en 2 fenetres (mode normal et "3
+// fenetres") - apparait 1 s (dur ajustable) a chaque changement de
+// photo, poignee ⌄ (au-dessus de la PHOTO) pour la rappeler. Puces
+// de dates de l'alti : meme principe (1 s, poignee ⌄ dediee).
 let p3Timer = null, chipsTimer = null;
 function barFlash(dur) {
   if (!MOBILE || wrapEl.classList.contains("single")) return;
@@ -889,16 +899,21 @@ function barFlash(dur) {
   p3Timer = setTimeout(() => {
     sh.classList.remove("show");
     wrapEl.classList.remove("baron");
-  }, dur || 500);
+  }, dur || 1000);
 }
 function chipsFlash(dur) {
   if (!profilOn) return;
   const ch = document.getElementById("prChips");
   ch.classList.add("show");
+  ch.parentElement.classList.add("chipsbar");
   if (chipsTimer) clearTimeout(chipsTimer);
-  chipsTimer = setTimeout(() => ch.classList.remove("show"), dur || 500);
+  chipsTimer = setTimeout(() => {
+    ch.classList.remove("show");
+    ch.parentElement.classList.remove("chipsbar");
+  }, dur || 1000);
 }
 document.getElementById("shHandle").onclick = () => barFlash(2500);
+document.getElementById("prHandle").onclick = () => chipsFlash(2500);
 document.getElementById("prClose").onclick = () => closeProfil();
 function prColor(date) {
   const m = media.find(x => x.date === date && x.color);
