@@ -29,6 +29,12 @@
      fixe (hauteur libre > cadre), defilement vertical a la petite main */
   #media img.tall{max-height:none;width:100%;height:auto;position:absolute;top:0;left:0;cursor:grab;touch-action:none;user-select:none;-webkit-user-drag:none}
   #media img.tall.drag{cursor:grabbing}
+  /* v5.13.1 : indice VISUEL de glissement (le cursor grab est invisible
+     sur ecran tactile) - badge main + doubles fleches, pulse, disparait
+     au premier glissement (classe .off) ou apres 5 s. */
+  #panHint{position:absolute;right:14px;bottom:14px;z-index:5;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:22px;background:rgba(0,0,0,.55);color:#fff;font-size:22px;line-height:1;pointer-events:none;animation:panPulse 1.6s ease-in-out infinite;transition:opacity .4s}
+  #panHint.off{opacity:0;animation:none}
+  @keyframes panPulse{0%,100%{transform:translateY(0);opacity:.95}50%{transform:translateY(-7px);opacity:.65}}
   #cap{padding:9px 12px;font-size:13px;color:#c8d2e0;border-top:1px solid #26304a}
   #cap .nm{font-weight:600;color:#eef2f8;margin-bottom:3px;word-wrap:break-word}
   #cap .dt{opacity:.75}
@@ -402,16 +408,29 @@ function fitSideToMedia(el, isVideo) {
 // pleine largeur, elle depasse le cadre -> glissement vertical borne
 // (0 en haut, cadre-image en bas), petite main (cursor grab), depart
 // CENTRE. Pointeur souris ET doigt (pointer events + setPointerCapture).
+// v5.13.1 : badge d'invitation au glissement - le curseur grab est
+// invisible sur Android ; ce badge visible pulse jusqu'au 1er glissement.
 function enablePan(el) {
   el.classList.add("tall");
   const box = mediaEl;
-  let top = 0, y0 = null;
+  let top = 0, y0 = null, hint = null, hintTimer = null;
+  function offHint() {
+    if (hint) { hint.classList.add("off"); hint = null; }
+    if (hintTimer) { clearTimeout(hintTimer); hintTimer = null; }
+  }
   requestAnimationFrame(() => {
     const max = Math.min(0, box.clientHeight - el.offsetHeight);
     if (max === 0) { el.classList.remove("tall"); return; } // tient entier
     top = max / 2; el.style.top = top + "px";               // centre
+    hint = document.createElement("div");
+    hint.id = "panHint";
+    hint.textContent = "⇕";
+    hint.insertAdjacentHTML("beforeend", "<span style='font-size:15px;font-weight:700'>glisser</span>");
+    box.appendChild(hint);
+    hintTimer = setTimeout(offHint, 5000);   // lache apres 5 s sans glissement
   });
   el.addEventListener("pointerdown", e => {
+    offHint();
     const max = Math.min(0, box.clientHeight - el.offsetHeight);
     if (max === 0) return;
     y0 = e.clientY - top; el.classList.add("drag");
