@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.15.7 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.15.8 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+     v5.15.8 = poignee ⌄ des dates alti : affichage 4 s (2500 ms
+     avant : trop court pour cocher plusieurs dates).
      v5.15.7 = temporisations 1 s (barre du haut ET puces dates de
      l'alti, rappel poignee = 2,5 s) ; poignee ⌄ AJOUTEE dans la
      fenetre altimetrie pour selectionner les dates ; poignee de la
@@ -913,7 +915,7 @@ function chipsFlash(dur) {
   }, dur || 1000);
 }
 document.getElementById("shHandle").onclick = () => barFlash(2500);
-document.getElementById("prHandle").onclick = () => chipsFlash(2500);
+document.getElementById("prHandle").onclick = () => chipsFlash(4000);   // v5.15.8 : 4 s pour cocher plusieurs dates
 document.getElementById("prClose").onclick = () => closeProfil();
 function prColor(date) {
   const m = media.find(x => x.date === date && x.color);
