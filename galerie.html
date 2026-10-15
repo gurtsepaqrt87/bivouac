@@ -1,11 +1,15 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.15.5 : chercher "v5.15" (Ctrl+U, Ctrl+F).
-     v5.15.5 = FIX mode "3 fenetres" : la PHOTO RESTE AFFICHEE
-     (v5.15.3/4 la masquaient). On gagne la place uniquement par la
-     barre du haut flottante + temporaire (4 s, poignee ⌄, rappel
-     automatique a chaque navigation photo) ; l'alti s'ajoute en
-     overlay 40% SOUS la carte. Bouton ✕ pour fermer l'alti.
+<!-- VERSION v5.15.6 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+     v5.15.6 = FLASH 0,5 s GENERALISE : (1) barre du haut flottante
+     en 2 fenetres - mode normal ET "3 fenetres" - apparait 0,5 s a
+     chaque changement de photo (poignee ⌄ : rappel 2,5 s ; chargement
+     initial : 1,5 s) ; (2) puces de DATES de l'alti flottantes aussi
+     (0,5 s par-dessus le haut du graphe a chaque photo) -> le graphe
+     garde toute sa hauteur ; (3) apres fermeture de l'alti (✕), la
+     barre flottante est CONSERVEE en 2 fenetres normal : la hauteur
+     photo+carte reste optimisee.
+     v5.15.5 = la PHOTO RESTE AFFICHEE en mode "3 fenetres".
      v5.15.4 = barre temporaire + bouton ✕ + alti 40%.
      v5.15.3 = MODE "3 FENETRES" (2F photo+carte + ⛰ de la carte) :
      photo masquee, barre du haut flottante translucide (survol
@@ -183,19 +187,24 @@
        date du media affiche ; les autres dates restent accessibles via
        les vues alti pleine hauteur (2F .alti ou 1F plein ecran). */
     #zoom #btProfil{width:40px;height:40px;font-size:19px}
-    #wrap:not(.alti):not(.showprofil) #profil.on #prChips{display:none}
+    #wrap:not(.alti):not(.showprofil) #profil.on #prChips{padding-top:6px}
     /* v5.15.3 : cas "3 fenetres" (2F photo+carte + ⛰ overlay) : photo
        masquee, barre du haut FLOTTANTE translucide par-dessus la carte,
        carte+alti occupent tout l'ecran -> l'altimetrie (45%) n'est plus
        tronquee. Retour a la normale en refermant l'alti. */
     #shHandle{display:none}
-    /* v5.15.5 : le mode "3 fenetres" NE MASQUE PLUS LA PHOTO - on
-       gagne la place uniquement en rendant la BARRE DU HAUT flottante
-       et temporaire (par-dessus la photo, 4 s + poignee ⌄) : le media
-       monte d'autant, l'alti s'ajoute SOUS la carte par overlay. */
-    #wrap.p3 #side .sh{position:absolute;top:0;left:0;right:0;z-index:1500;background:#11151dcc;backdrop-filter:blur(4px);border-bottom:1px solid #39445c;opacity:0;pointer-events:none;transition:opacity .3s}
-    #wrap.p3 #side .sh.show{opacity:1;pointer-events:auto}
-    #wrap.p3:not(.p3bar) #shHandle{display:flex;position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:1501;height:26px;padding:0 14px;border-radius:0 0 10px 10px;border:1px solid #b35300;border-top:none;background:#ff7a00cc;color:#fff;font-size:14px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
+    /* v5.15.6 : en 2 FENETRES (mode normal OU "3 fenetres" p3), la
+       barre du haut est TOUJOURS flottante et temporaire (0,5 s par
+       defaut) par-dessus la photo : le media monte d'autant, la
+       hauteur photo+carte est optimisee. Poignee ⌄ pour la rappeler. */
+    #wrap:not(.single) #side .sh{position:absolute;top:0;left:0;right:0;z-index:1500;background:#11151dcc;backdrop-filter:blur(4px);border-bottom:1px solid #39445c;opacity:0;pointer-events:none;transition:opacity .3s}
+    #wrap:not(.single) #side .sh.show{opacity:1;pointer-events:auto}
+    #wrap:not(.single):not(.baron) #shHandle{display:flex;position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:1501;height:26px;padding:0 14px;border-radius:0 0 10px 10px;border:1px solid #b35300;border-top:none;background:#ff7a00cc;color:#fff;font-size:14px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
+    /* v5.15.6 : puces de DATES de l'alti = aussi FLOTTANTES (par-dessus
+       le haut du graphe, 0,5 s a chaque changement de photo) - le
+       graphe garde toute sa hauteur, plus de troncature */
+    #profil.on #prChips{position:absolute;top:0;left:0;right:0;z-index:5;background:#0d1117f0;opacity:0;pointer-events:none;transition:opacity .25s}
+    #profil.on #prChips.show{opacity:1;pointer-events:auto}
     /* bouton FERMER l'alti (en haut a droite de l'alti) */
     #prClose{display:none}
     #wrap.p3 #prClose{display:flex;position:absolute;top:6px;right:8px;z-index:1600;width:36px;height:36px;border-radius:10px;border:2px solid #b35300;background:#ff7a00;color:#fff;font-size:17px;font-weight:700;align-items:center;justify-content:center;cursor:pointer}
@@ -610,7 +619,8 @@ function openGal(i) {
   // zone admin : pre-remplir le champ commentaire si mode admin
   if (ADM) { document.getElementById("admTxt").value = m.commentaire || ""; }
   // le menu Date suit le media affiche
-  if (profilOn) { profilCursor(); p3Bar(true); } // v5.14 curseur + v5.15.4 barre temporaire
+  if (profilOn) { profilCursor(); chipsFlash(); } // v5.14 curseur + v5.15.6 puces flash
+  barFlash();                                    // v5.15.6 : barre flottante 0,5 s
   const dSel = document.getElementById("btDate");
   if (dSel.value !== m.date) dSel.value = m.date;
   applySel();
@@ -773,6 +783,9 @@ document.getElementById("btFlip").onclick = () => {
 document.getElementById("hdFlip").onclick = () => { wrapEl.classList.add("showmap"); render(); };
 document.getElementById("hdLayout").onclick = toggleLayout;
 document.getElementById("btLayoutM").onclick = toggleLayout;
+// v5.15.6 : au chargement en 2 fenetres, montrer la barre flottante
+// une fois (1,5 s) que l'utilisateur sache ou la trouver (⌄ ensuite)
+setTimeout(() => barFlash(1500), 400);
 // glisse vertical > 60 px sur la photo ou la carte = bascule panneau
 function bindVerticalSwipe(el) {
   let s = null;
@@ -836,7 +849,7 @@ async function openProfil() {
   if (MOBILE && !wrapEl.classList.contains("single")
       && !wrapEl.classList.contains("alti")) {
     wrapEl.classList.add("p3");
-    p3Bar(true);                     // v5.15.4 : barre temporaire 4 s
+    barFlash(1500);                  // v5.15.6 : barre flash 1,5 s a l'ouverture
   }
   if (!profilData) {
     try { profilData = await (await fetch(BASE + "/profil.json")).json(); }
@@ -856,23 +869,36 @@ async function openProfil() {
 function closeProfil() {
   profilOn = false;
   wrapEl.classList.remove("p3");   // v5.15.3 : retour 2F normal
-  wrapEl.classList.remove("p3bar"); // v5.15.4 : barre temporaire
+  const sh = document.querySelector("#side .sh");
+  if (p3Timer) { clearTimeout(p3Timer); p3Timer = null; }
+  sh.classList.remove("show"); wrapEl.classList.remove("baron");
   document.getElementById("profil").classList.remove("on");
   document.getElementById("btProfil").classList.remove("on");
 }
-// v5.15.4 : en mode "3 fenetres" (.p3), la barre du haut n'apparait
-// que TEMPORAIREMENT (4 s) - poignee ⌄ en haut de la carte, ou
-// automatiquement a chaque navigation photo.
-let p3Timer = null;
-function p3Bar(show) {
-  if (!wrapEl.classList.contains("p3")) return;
+// v5.15.6 : barre du haut FLOTTANTE en 2 fenetres (mode normal et "3
+// fenetres") - apparait 0,5 s (dur ajustable) a chaque changement de
+// photo, poignee ⌄ pour la rappeler. Puces de dates de l'alti : meme
+// principe (0,5 s par-dessus le haut du graphe).
+let p3Timer = null, chipsTimer = null;
+function barFlash(dur) {
+  if (!MOBILE || wrapEl.classList.contains("single")) return;
   const sh = document.querySelector("#side .sh");
-  sh.classList.toggle("show", show);
-  wrapEl.classList.toggle("p3bar", show);
+  sh.classList.add("show");
+  wrapEl.classList.add("baron");
   if (p3Timer) clearTimeout(p3Timer);
-  if (show) p3Timer = setTimeout(() => p3Bar(false), 4000);
+  p3Timer = setTimeout(() => {
+    sh.classList.remove("show");
+    wrapEl.classList.remove("baron");
+  }, dur || 500);
 }
-document.getElementById("shHandle").onclick = () => p3Bar(true);
+function chipsFlash(dur) {
+  if (!profilOn) return;
+  const ch = document.getElementById("prChips");
+  ch.classList.add("show");
+  if (chipsTimer) clearTimeout(chipsTimer);
+  chipsTimer = setTimeout(() => ch.classList.remove("show"), dur || 500);
+}
+document.getElementById("shHandle").onclick = () => barFlash(2500);
 document.getElementById("prClose").onclick = () => closeProfil();
 function prColor(date) {
   const m = media.find(x => x.date === date && x.color);
