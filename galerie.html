@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.15.4 : chercher "v5.15" (Ctrl+U, Ctrl+F).
-     v5.15.4 = FIX mode "3 fenetres" : la barre du haut n'est plus
-     affichee en PERMANENCE (elle masquait la pile de zoom -> plus
-     moyen de fermer l'alti). Desormais : barre TEMPORAIRE (4 s,
-     poignee ⌄ en haut de carte ou automatique a chaque navigation
-     photo), bouton ✕ en haut a droite de l'alti pour la fermer,
-     alti ramenee a 40% (45% = trop haut).
+<!-- VERSION v5.15.5 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+     v5.15.5 = FIX mode "3 fenetres" : la PHOTO RESTE AFFICHEE
+     (v5.15.3/4 la masquaient). On gagne la place uniquement par la
+     barre du haut flottante + temporaire (4 s, poignee ⌄, rappel
+     automatique a chaque navigation photo) ; l'alti s'ajoute en
+     overlay 40% SOUS la carte. Bouton ✕ pour fermer l'alti.
+     v5.15.4 = barre temporaire + bouton ✕ + alti 40%.
      v5.15.3 = MODE "3 FENETRES" (2F photo+carte + ⛰ de la carte) :
      photo masquee, barre du haut flottante translucide (survol
      temporaire par-dessus la carte), carte+alti occupent tout
@@ -188,20 +188,15 @@
        masquee, barre du haut FLOTTANTE translucide par-dessus la carte,
        carte+alti occupent tout l'ecran -> l'altimetrie (45%) n'est plus
        tronquee. Retour a la normale en refermant l'alti. */
-    #wrap.p3 #side{flex:0 0 0;min-height:0;border-right:none}
-    #wrap.p3 #side #media,#wrap.p3 #side #cap,
-    #wrap.p3 #side #admBox{display:none}
-    /* v5.15.4 : la barre du haut n'est plus AFFICHEE en permanence -
-       elle etait par-dessus la pile de zoom (le ⛰ devenait
-       inaccessible, impossible de fermer l'alti). Elle apparait
-       TEMPORAIREMENT (4 s) via la poignee ⌄, ou a chaque navigation
-       photo, puis s'efface. */
-    #wrap.p3 .sh{position:absolute;top:0;left:0;right:0;z-index:1500;background:#11151dcc;backdrop-filter:blur(4px);border-bottom:1px solid #39445c;opacity:0;pointer-events:none;transition:opacity .3s}
-    #wrap.p3 .sh.show{opacity:1;pointer-events:auto}
     #shHandle{display:none}
+    /* v5.15.5 : le mode "3 fenetres" NE MASQUE PLUS LA PHOTO - on
+       gagne la place uniquement en rendant la BARRE DU HAUT flottante
+       et temporaire (par-dessus la photo, 4 s + poignee ⌄) : le media
+       monte d'autant, l'alti s'ajoute SOUS la carte par overlay. */
+    #wrap.p3 #side .sh{position:absolute;top:0;left:0;right:0;z-index:1500;background:#11151dcc;backdrop-filter:blur(4px);border-bottom:1px solid #39445c;opacity:0;pointer-events:none;transition:opacity .3s}
+    #wrap.p3 #side .sh.show{opacity:1;pointer-events:auto}
     #wrap.p3:not(.p3bar) #shHandle{display:flex;position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:1501;height:26px;padding:0 14px;border-radius:0 0 10px 10px;border:1px solid #b35300;border-top:none;background:#ff7a00cc;color:#fff;font-size:14px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
-    /* v5.15.4 : bouton FERMER l'alti (le ⛰ de la pile est remonte sous
-       la barre ; ce ✕ est l'evidence, en haut a droite de l'alti) */
+    /* bouton FERMER l'alti (en haut a droite de l'alti) */
     #prClose{display:none}
     #wrap.p3 #prClose{display:flex;position:absolute;top:6px;right:8px;z-index:1600;width:36px;height:36px;border-radius:10px;border:2px solid #b35300;background:#ff7a00;color:#fff;font-size:17px;font-weight:700;align-items:center;justify-content:center;cursor:pointer}
     #wrap.p3 #profil{height:40%}
