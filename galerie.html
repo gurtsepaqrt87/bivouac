@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.13.2 : chercher "v5.13" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.13.4 : chercher "v5.13" (Ctrl+U, Ctrl+F).
+     v5.13.4 = CLIC MARQUEUR LAPTOP : setPointerCapture redirigeait le
+     click vers la carte, jamais vers le marqueur (hit-test au pointerup).
      v5.13 = PORTRAIT PANORAMABLE : miniatures portraits non recadrees
      (etape1 v5.7, 600 x H), affichees pleine largeur dans le cadre fixe
      avec defilement vertical a la petite main (enablePan).
@@ -124,6 +126,12 @@
        ne faisait RIEN en 2 fenetres) : on le MASQUE. Il revient en
        monofenetre, ou il bascule galerie -> carte. */
     #wrap:not(.single) #hdFlip{display:none}
+    /* v5.13.3 : idem pour le bouton layout de la carte (btLayoutM) :
+       en 2 FENETRES il duplique le hdLayout de l'entete (toujours
+       visible) -> masque. En MONOFENETRE carte (.single.showmap),
+       l'entete est masque : btLayoutM reste le SEUL moyen de
+       revenir a la vue 2 fenetres -> affiche. */
+    #wrap:not(.single) #btLayoutM{display:none}
     /* bouton layout 2-fenetres, sur la carte (mobile seulement) */
     #btLayoutM{display:flex;position:absolute;left:64px;bottom:14px;z-index:1001;width:46px;height:46px;border-radius:12px;border:2px solid #b35300;background:#ff7a00cc;color:#fff;font-size:18px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
     #btLayoutM:hover{background:#ffa040}
@@ -357,6 +365,7 @@ function endPointer(e) {
   if (pts.size < 2) pinch = null;
   if (!drag) return;
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  const wasMoved = drag.moved;   // v5.13.4 : hit-test marqueur si non-drag
   if (drag.moved) {
     // glisse gauche (dx<0) => centre deplace de -dx => vers l'EST.
     // glisse bas (dy>0) => centre deplace de -dy => vers le NORD.
@@ -367,6 +376,23 @@ function endPointer(e) {
     render();
   }
   drag = null; mapEl.classList.remove("drag");
+  // v5.13.4 : CLIC MARQUEUR EN MODE LAPTOP. Le pointerdown fait
+  // setPointerCapture(mapEl) : le navigateur redirige alors le clic
+  // vers la CAPTUREE (la carte), jamais vers le marqueur - le handler
+  // click des marqueurs ne se declenchait donc PAS a la souris (ca
+  // marchait au doigt : le click synthetique tactile vise l'element
+  // d'origine). Parade : hit-test au pointerup - si le pointeur n'a
+  // PAS bouge (pas un drag) et lache sur un marqueur, on ouvre la
+  // galerie sur ce media. Le handler click reste pour les navigateurs
+  // ou il marche (double appel inoffensif : openGal est idempotent).
+  if (!wasMoved) {
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const mk = hit && hit.closest ? hit.closest(".mk") : null;
+    if (mk) {
+      const found = marks.find(m => m.el === mk);
+      if (found) openGal(found.i);
+    }
+  }
 }
 mapEl.addEventListener("pointerup", endPointer);
 mapEl.addEventListener("pointercancel", endPointer);
@@ -758,4 +784,4 @@ load();
 </body>
 </html>
 
-<!-- DOCUMENT FINAL - galerie v5.13.2 - deplacer ce fichier vers galerie.html - PORTRAIT PANORAMABLE (enablePan, img.tall, etape1 v5.7) -->
+<!-- DOCUMENT FINAL - galerie v5.13.4 - deplacer ce fichier vers galerie.html -->
