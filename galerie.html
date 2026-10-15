@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.14.2 : chercher "v5.14" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.15 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+     v5.15 = VUES ALTIMETRIE MOBILES (bouton ⛰ dans l'entete) :
+     - 1 fenetre : ⛰ = altimetrie PLEIN ECRAN (retour photo par ⇅)
+     - 2 fenetres : ⛰ = bas de panneau passe de la CARTE a l'ALTI
+       (et inversement) -> combos photo+carte / photo+alti ; la vue
+     carte+alti reste accessible en 1F carte (⛰ de la pile zoom =
+     overlay 35% comme avant).
      v5.14.2 = FIX curseur altimetrie : l'heure des photos (nom de
      fichier, heure locale) etait lue en UTC -> decalage +2h (ete) :
      curseur trop a droite en debut de journee, invisible sur les 2
@@ -109,7 +115,7 @@
      de base (#zoom, select.nav, #bar a...), elle etait systematiquement
      ecrasee (bug v5.3 : zoom visibles, boutons hdFlip masques sur S8). */
   /* bases "cachees par defaut" (laptop) : AVANT les media queries */
-  #hdFlip,#hdLayout{display:none}
+  #hdFlip,#hdLayout,#hdAlti{display:none}
   #btFlip{display:none}
   #btLayoutM{display:none}
   /* monofenetre (ecran tres etroit) : photo OU carte, bascule glisse/bouton */
@@ -121,6 +127,21 @@
   #wrap.single.showmap #mapwrap{flex:1}
   #wrap.single.showmap #btFlip{display:flex;position:absolute;left:10px;bottom:14px;z-index:1001;width:46px;height:46px;border-radius:12px;border:2px solid #b35300;background:#ff7a00cc;color:#fff;font-size:22px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
   #wrap.single.showmap #btFlip:hover{background:#ffa040}
+  /* v5.15 : ALTI PLEIN ECRAN en 1F (bouton ⛰ de l'entete photo) -
+     le panneau #profil (dans #mapwrap) remplace TOUT : map masquee */
+  #wrap.single.showprofil #side{display:none}
+  #wrap.single.showprofil #mapwrap{display:block;flex:1}
+  #wrap.single.showprofil #map{display:none}
+  #wrap.single.showprofil #zoom,#wrap.single.showprofil #bar,
+  #wrap.single.showprofil #btLayoutM{display:none}
+  #wrap.single.showprofil #profil{display:flex;position:relative;height:100%;border-top:none}
+  #wrap.single.showprofil #btFlip{display:flex;position:absolute;left:10px;bottom:14px;z-index:1001;width:46px;height:46px;border-radius:12px;border:2px solid #b35300;background:#ff7a00cc;color:#fff;font-size:22px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
+  #wrap.single.showprofil #btFlip:hover{background:#ffa040}
+  /* v5.15 : en 2F, bas de panneau = ALTIMETRIE (carte masquee, profil
+     a pleine hauteur du bas de panneau) -> combo photo + altimetrie */
+  #wrap.alti #map{display:none}
+  #wrap.alti #zoom,#wrap.alti #bar,#wrap.alti #btLayoutM{display:none}
+  #wrap.alti #profil{display:flex;position:relative;height:auto;flex:1;border-top:none}
   /* empilement portrait : galerie au-dessus (55%), carte dessous */
   @media (orientation: portrait) and (max-width:820px){
     #wrap{flex-direction:column}
@@ -146,6 +167,10 @@
     #admBox button{height:38px;font-size:14px}
     /* boutons d'entete photo (mobile seulement) : bascule carte + layout */
     #hdFlip,#hdLayout{display:flex;flex:0 0 40px;height:40px;font-size:17px;align-items:center;justify-content:center}
+    /* v5.15 : bouton ALTIMETRIE dans l'entete - present en 1F (photo ->
+       alti plein ecran) ET en 2F (bas de panneau carte -> alti) */
+    #hdAlti{display:flex;flex:0 0 40px;height:40px;font-size:17px;align-items:center;justify-content:center;background:#1c2230}
+    #hdAlti.on{background:#1f77e5}
     /* v5.13.2 : en mode 2 FENETRES (non .single), le bouton carte (hdFlip)
        est INUTILE - showmap n'agit qu'en monofenetre (bug constate : il
        ne faisait RIEN en 2 fenetres) : on le MASQUE. Il revient en
@@ -175,6 +200,7 @@
       <button class="nav" id="prev" title="Précédent (←)">‹</button>
       <div class="selwrap"><span class="selbox"><select class="nav" id="btDate" title="Journée affichée"></select><span class="selArrow">▾</span></span></div>
       <button class="nav" id="hdFlip" title="Voir la carte">🗺</button>
+      <button class="nav" id="hdAlti" title="Voir l'altimétrie">⛰</button>
       <button class="nav" id="hdLayout" title="Affichage 2 fenêtres">⧉</button>
       <span id="cnt"></span>
       <button class="nav" id="next" title="Suivant (→)">›</button>
@@ -659,6 +685,12 @@ let layout2 = true;   // v5.13.2 : preference mobile - DOUBLE FENETRE par
 function applyLayout() {
   // monofenetre si ecran tres etroit ET pas de preference 2-fenetres
   wrapEl.classList.toggle("single", MOBILE && innerWidth <= 520 && !layout2);
+  // v5.15 : hors smartphone, les vues alti specifiques n'existent pas
+  if (!MOBILE) {
+    wrapEl.classList.remove("alti");
+    wrapEl.classList.remove("showprofil");
+    document.getElementById("hdAlti").classList.remove("on");
+  }
 }
 function updateSingle() {
   applyLayout();
@@ -670,13 +702,27 @@ function toggleMap() {
 }
 function toggleLayout() {
   layout2 = !layout2;
+  // v5.15 : changer de layout quitte la vue alti en cours (les classes
+  // .alti (2F) et .showprofil (1F) ne correspondent plus au nouveau
+  // layout -> retour a un etat propre)
+  wrapEl.classList.remove("alti");
+  wrapEl.classList.remove("showprofil");
+  document.getElementById("hdAlti").classList.remove("on");
+  closeProfil();
   applyLayout();
   render();
 }
 updateSingle();
 window.addEventListener("resize", updateSingle);
 // cablage des boutons mobiles (invisibles sur laptop) :
-document.getElementById("btFlip").onclick = () => wrapEl.classList.remove("showmap");
+document.getElementById("btFlip").onclick = () => {
+  // v5.15 : le retour photo quitte AUSSI la vue alti plein ecran
+  wrapEl.classList.remove("showmap");
+  wrapEl.classList.remove("showprofil");
+  document.getElementById("hdAlti").classList.remove("on");
+  if (!wrapEl.classList.contains("alti")) closeProfil();
+  render();
+};
 document.getElementById("hdFlip").onclick = () => { wrapEl.classList.add("showmap"); render(); };
 document.getElementById("hdLayout").onclick = toggleLayout;
 document.getElementById("btLayoutM").onclick = toggleLayout;
@@ -730,10 +776,14 @@ function photoEpoch(m) {
   return mt ? new Date(+mt[1], +mt[2] - 1, +mt[3], +mt[4], +mt[5], +mt[6]).getTime() : null;
 }
 async function toggleProfil() {
-  profilOn = !profilOn;
-  document.getElementById("profil").classList.toggle("on", profilOn);
-  document.getElementById("btProfil").classList.toggle("on", profilOn);
-  if (!profilOn) return;
+  // v5.15 : ouvert/ferme factorises (utilise aussi par la vue mobile)
+  if (profilOn) closeProfil();
+  else await openProfil();
+}
+async function openProfil() {
+  profilOn = true;
+  document.getElementById("profil").classList.add("on");
+  document.getElementById("btProfil").classList.add("on");
   if (!profilData) {
     try { profilData = await (await fetch(BASE + "/profil.json")).json(); }
     catch (e) { profilData = { dates: {} }; }
@@ -748,6 +798,11 @@ async function toggleProfil() {
   }
   if (!prDates.size && media[sel]) prDates.add(media[sel].date);
   drawProfil();
+}
+function closeProfil() {
+  profilOn = false;
+  document.getElementById("profil").classList.remove("on");
+  document.getElementById("btProfil").classList.remove("on");
 }
 function prColor(date) {
   const m = media.find(x => x.date === date && x.color);
@@ -891,6 +946,38 @@ document.getElementById("prSvg").addEventListener("click", e => {
   if (best >= 0 && bd < 90 * 60 * 1000) openGal(best);   // sinon : clic trop loin de toute photo
 });
 document.getElementById("btProfil").onclick = toggleProfil;
+// v5.15 : bouton ⛰ de l'ENTETE (mobile) - deux comportements :
+//  - 1 fenetre : alti PLEIN ECRAN (classe .showprofil), retour photo
+//    par le bouton flottant ⇅ (btFlip)
+//  - 2 fenetres : le BAS DE PANNEAU bascule carte -> altimetrie
+//    (classe .alti : carte masquee, #profil a pleine hauteur)
+async function toggleAlti() {
+  const hd = document.getElementById("hdAlti");
+  if (wrapEl.classList.contains("single")) {
+    if (wrapEl.classList.contains("showprofil")) {
+      wrapEl.classList.remove("showprofil");
+      hd.classList.remove("on");
+      closeProfil();
+    } else {
+      wrapEl.classList.remove("showmap");
+      wrapEl.classList.add("showprofil");
+      hd.classList.add("on");
+      await openProfil();
+    }
+  } else {
+    if (wrapEl.classList.contains("alti")) {
+      wrapEl.classList.remove("alti");
+      hd.classList.remove("on");
+      closeProfil();
+    } else {
+      wrapEl.classList.add("alti");
+      hd.classList.add("on");
+      await openProfil();
+    }
+  }
+  render();
+}
+document.getElementById("hdAlti").onclick = toggleAlti;
 window.addEventListener("resize", () => { if (profilOn) drawProfil(); });
 
 // ---------- glissé sur la photo/video : navigation precedente/suivante ----------
