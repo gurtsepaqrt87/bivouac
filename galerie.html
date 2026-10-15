@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.15.11 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.15.12 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+     v5.15.12 = grille dates alti 4 LIGNES (colonnes de 4, glissement
+     horizontal) ; ouverture alti : grille visible 6 s ; clic poignee :
+     7 s ; PLUS de flash de la grille au defilement des photos (la
+     poignee reste le seul rappel) ; suivi auto de la date photo et
+     statique des dates manuelles (v5.15.10) conserves.
      v5.15.11 = puces de dates alti en GRILLE : 3 LIGNES, colonnes
      de 3 dates (glissement horizontal pour les colonnes suivantes)
      -> toutes les dates voisines visibles d'un coup d'oeil ;
@@ -226,10 +231,9 @@
     /* v5.15.6 : puces de DATES de l'alti = aussi FLOTTANTES (par-dessus
        le haut du graphe, 0,5 s a chaque changement de photo) - le
        graphe garde toute sa hauteur, plus de troncature */
-    /* v5.15.11 : puces en GRILLE 3 lignes x colonnes de 3 dates
-       (glissement horizontal = colonnes suivantes) - toutes les
-       dates voisines visibles d'un coup d'oeil pour la selection */
-    #profil.on #prChips{position:absolute;top:0;left:0;right:0;z-index:5;background:#0d1117f2;opacity:0;pointer-events:none;transition:opacity .25s;display:grid;grid-auto-flow:column;grid-template-rows:repeat(3,auto);grid-auto-columns:max-content;align-content:start;gap:4px;padding:8px;overflow-x:auto;max-height:112px}
+    /* v5.15.12 : puces en GRILLE 4 LIGNES x colonnes de 4 dates
+       (glissement horizontal = colonnes suivantes) */
+    #profil.on #prChips{position:absolute;top:0;left:0;right:0;z-index:5;background:#0d1117f2;opacity:0;pointer-events:none;transition:opacity .25s;display:grid;grid-auto-flow:column;grid-template-rows:repeat(4,auto);grid-auto-columns:max-content;align-content:start;gap:4px;padding:8px;overflow-x:auto;max-height:148px}
     #profil.on #prChips.show{opacity:1;pointer-events:auto}
     /* bouton FERMER l'alti (en haut a droite de l'alti) */
     #prClose{display:none}
@@ -648,8 +652,8 @@ function openGal(i) {
   // zone admin : pre-remplir le champ commentaire si mode admin
   if (ADM) { document.getElementById("admTxt").value = m.commentaire || ""; }
   // le menu Date suit le media affiche
-  if (profilOn) { syncPrDates(); drawProfil(); chipsFlash(); } // v5.15.10 : la date alti suit la photo
-  barFlash();                                   // v5.15.6 : barre flottante
+  if (profilOn) { syncPrDates(); drawProfil(); } // v5.15.10 : la date alti suit la photo (v5.15.12 : plus de flash puces au defilement)
+  barFlash();                                    // v5.15.6 : barre flottante
   const dSel = document.getElementById("btDate");
   if (dSel.value !== m.date) dSel.value = m.date;
   applySel();
@@ -905,6 +909,7 @@ async function openProfil() {
   }
   syncPrDates();                      // v5.15.10 : manuelles + date photo
   drawProfil();
+  chipsFlash(6000);                    // v5.15.12 : grille dates visible 6 s a l'ouverture
 }
 function closeProfil() {
   profilOn = false;
@@ -943,7 +948,7 @@ function chipsFlash(dur) {
   }, dur || 1000);
 }
 document.getElementById("shHandle").onclick = () => barFlash(2500);
-document.getElementById("prHandle").onclick = () => chipsFlash(5000);   // v5.15.11 : 5 s + grille 3 lignes
+document.getElementById("prHandle").onclick = () => chipsFlash(7000);   // v5.15.12 : 7 s par clic poignee
 document.getElementById("prClose").onclick = () => closeProfil();
 function prColor(date) {
   const m = media.find(x => x.date === date && x.color);
