@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.14.1 : chercher "v5.14" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.14.2 : chercher "v5.14" (Ctrl+U, Ctrl+F).
+     v5.14.2 = FIX curseur altimetrie : l'heure des photos (nom de
+     fichier, heure locale) etait lue en UTC -> decalage +2h (ete) :
+     curseur trop a droite en debut de journee, invisible sur les 2
+     dernieres heures. Aussi : photo hors trace (avant allumage GPS /
+     apres extinction) -> curseur aux bornes de la journee la plus
+     proche, au lieu de disparaitre.
      v5.14.1 = FIX altimetrie : (1) journees mises bout a bout sur un
      axe virtuel -> les nuits ne creent plus d'espaces vides entre les
      courbes (separateur pointille discret entre journees) ; (2) le
@@ -716,8 +722,12 @@ document.getElementById("btDate").addEventListener("change", e => {
 let profilData = null, profilOn = false, prDates = new Set(), prMap = null;
 const NSVG = "http://www.w3.org/2000/svg";
 function photoEpoch(m) {
+  // v5.14.2 : heure LOCALE du navigateur (meme fuseau que l'appareil
+  // photo qui a nomme le fichier). AVANT : Date.UTC -> +2h de decalage
+  // en ete francais -> curseur decale a droite puis disparait sur les
+  // 2 dernieres heures de la journee (hors trace).
   const mt = (m.name || "").match(/(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})/);
-  return mt ? Date.UTC(+mt[1], +mt[2] - 1, +mt[3], +mt[4], +mt[5], +mt[6]) : null;
+  return mt ? new Date(+mt[1], +mt[2] - 1, +mt[3], +mt[4], +mt[5], +mt[6]).getTime() : null;
 }
 async function toggleProfil() {
   profilOn = !profilOn;
@@ -781,7 +791,7 @@ function drawProfil() {
     return null;                          // hors journees selectionnees
   };
   const Y = e => H - 16 - (e - emin) / (emax - emin) * (H - 28);
-  prMap = { blocks: blocks, Vtot: Vtot, X: X, Y: Y, emin: emin, emax: emax };
+  prMap = { blocks: blocks, Vtot: Vtot, X: X, Y: Y, emin: emin, emax: emax, W: W };
   for (let i = 0; i <= 4; i++) {          // grille horizontale + cotes
     const e = emin + (emax - emin) * i / 4;
     const ln = document.createElementNS(NSVG, "line");
@@ -816,17 +826,29 @@ function profilCursor() {
   const svg = document.getElementById("prSvg");
   svg.querySelectorAll(".prCur").forEach(x => x.remove());
   const t = photoEpoch(media[sel]);
-  const x = t === null ? null : prMap.X(t);
-  if (x === null) return;
-  // bloc (journee) de la photo + altitude interpolee dedans
-  const blk = prMap.blocks.find(b => t >= b.t0 && t <= b.t1);
-  if (!blk) return;
+  if (t === null) return;
+  // v5.14.2 : journee la plus PROCHE, puis position bornee aux bornes
+  // de la trace -> le curseur reste visible au DEBUT de la courbe pour
+  // une photo prise avant l'allumage du GPS, et a la FIN pour une photo
+  // prise apres l'extinction (au lieu de disparaitre).
+  let blk = prMap.blocks.find(b => t >= b.t0 && t <= b.t1);
+  if (!blk) {
+    let bd = Infinity;
+    for (const b of prMap.blocks) {
+      const dd = t < b.t0 ? b.t0 - t : t - b.t1;
+      if (dd < bd) { bd = dd; blk = b; }
+    }
+    if (!blk) return;
+  }
+  const tc = Math.min(Math.max(t, blk.t0), blk.t1);   // heure bornee dans la trace
+  const x = 42 + (blk.off + (tc - blk.t0)) / prMap.Vtot * (prMap.W - 54);
+  // altitude interpolee dans la journee (a l'heure bornee tc)
   let e = blk.pts[0][1];
   for (let i = 0; i < blk.pts.length; i++)
-    if (blk.pts[i][0] >= t) {
+    if (blk.pts[i][0] >= tc) {
       if (i === 0) e = blk.pts[0][1];
       else { const [t1, e1] = blk.pts[i - 1], [t2, e2] = blk.pts[i];
-             e = e1 + (e2 - e1) * (t - t1) / (t2 - t1); }
+             e = e1 + (e2 - e1) * (tc - t1) / (t2 - t1); }
       break;
     }
   const ln = document.createElementNS(NSVG, "line");
