@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.15.2 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.15.3 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+     v5.15.3 = MODE "3 FENETRES" (2F photo+carte + ⛰ de la carte) :
+     photo masquee, barre du haut flottante translucide (survol
+     temporaire par-dessus la carte), carte+alti occupent tout
+     l'ecran, alti agrandie a 45% -> plus de troncature en bas.
      v5.15.2 = FIX : bouton ⧉ (retour 2 fenetres) visible en alti
      plein ecran 1F - c'etait le seul ecran d'ou l'on ne pouvait
      PAS revenir en double fenetre.
@@ -42,7 +46,7 @@
 <title>Journal vélo — Galerie</title>
 <style>
   html,body{margin:0;height:100%;font-family:system-ui,Segoe UI,sans-serif;background:#0b0e13;color:#eee;overflow:hidden}
-  #wrap{display:flex;height:100%;width:100%}
+  #wrap{display:flex;height:100%;width:100%;position:relative}
   /* --- partie 1 : galerie (gauche) --- */
   #side{flex:0 0 var(--side-w,340px);background:#11151d;border-right:1px solid #39445c;display:flex;flex-direction:column;min-width:0}
   #side .sh{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #26304a}
@@ -174,6 +178,15 @@
        les vues alti pleine hauteur (2F .alti ou 1F plein ecran). */
     #zoom #btProfil{width:40px;height:40px;font-size:19px}
     #wrap:not(.alti):not(.showprofil) #profil.on #prChips{display:none}
+    /* v5.15.3 : cas "3 fenetres" (2F photo+carte + ⛰ overlay) : photo
+       masquee, barre du haut FLOTTANTE translucide par-dessus la carte,
+       carte+alti occupent tout l'ecran -> l'altimetrie (45%) n'est plus
+       tronquee. Retour a la normale en refermant l'alti. */
+    #wrap.p3 #side{flex:0 0 0;min-height:0;border-right:none}
+    #wrap.p3 #side #media,#wrap.p3 #side #cap,
+    #wrap.p3 #side #admBox{display:none}
+    #wrap.p3 .sh{position:absolute;top:0;left:0;right:0;z-index:1500;background:#11151dcc;backdrop-filter:blur(4px);border-bottom:1px solid #39445c}
+    #wrap.p3 #profil{height:45%}
     /* l'URL/nom de fichier n'apporte rien sur mobile : date deja dans
        le menu, le commentaire reste (bloc #cmt) */
     #cap .nm,#cap .dt{display:none}
@@ -803,6 +816,11 @@ async function openProfil() {
   profilOn = true;
   document.getElementById("profil").classList.add("on");
   document.getElementById("btProfil").classList.add("on");
+  // v5.15.3 : overlay alti sur la carte en 2F smartphone ("3 fenetres")
+  // -> masquer la photo, barre du haut flottante, alti agrandie a 45%
+  if (MOBILE && !wrapEl.classList.contains("single")
+      && !wrapEl.classList.contains("alti"))
+    wrapEl.classList.add("p3");
   if (!profilData) {
     try { profilData = await (await fetch(BASE + "/profil.json")).json(); }
     catch (e) { profilData = { dates: {} }; }
@@ -820,6 +838,7 @@ async function openProfil() {
 }
 function closeProfil() {
   profilOn = false;
+  wrapEl.classList.remove("p3");   // v5.15.3 : retour 2F normal
   document.getElementById("profil").classList.remove("on");
   document.getElementById("btProfil").classList.remove("on");
 }
