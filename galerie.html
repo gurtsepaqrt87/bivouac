@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.15.1 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.15.2 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+     v5.15.2 = FIX : bouton ⧉ (retour 2 fenetres) visible en alti
+     plein ecran 1F - c'etait le seul ecran d'ou l'on ne pouvait
+     PAS revenir en double fenetre.
      v5.15.1 = FIX MOBILE : (1) altimetrie en OVERLAY sur la carte
      (2F photo+carte + ⛰) : puces de dates masquees -> le graphe
      n'est plus tronque en bas ; (2) bouton ⛰ de la pile reduit
@@ -136,8 +139,12 @@
   #wrap.single.showprofil #side{display:none}
   #wrap.single.showprofil #mapwrap{display:block;flex:1}
   #wrap.single.showprofil #map{display:none}
-  #wrap.single.showprofil #zoom,#wrap.single.showprofil #bar,
-  #wrap.single.showprofil #btLayoutM{display:none}
+  #wrap.single.showprofil #zoom,#wrap.single.showprofil #bar{display:none}
+  /* v5.15.2 : le bouton ⧉ (retour 2 fenetres) doit rester VISIBLE en
+     alti plein ecran - c'est le seul moyen d'en sortir sans repasser
+     par la photo (btLayoutM est masque via #zoom/#bar mais il est
+     PILE-EXTERIEUR : on le reaffiche ici, en bas de l'ecran) */
+  #wrap.single.showprofil #btLayoutM{display:flex}
   #wrap.single.showprofil #profil{display:flex;position:relative;height:100%;border-top:none}
   #wrap.single.showprofil #btFlip{display:flex;position:absolute;left:10px;bottom:14px;z-index:1001;width:46px;height:46px;border-radius:12px;border:2px solid #b35300;background:#ff7a00cc;color:#fff;font-size:22px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
   #wrap.single.showprofil #btFlip:hover{background:#ffa040}
