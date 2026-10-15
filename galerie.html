@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.15.12 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.15.13 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+     v5.15.13 = FIX dates manquantes : profil.json RECHARGE a chaque
+     ouverture de l'alti, cache contourne (no-store) - les journees
+     reprocessees apparaissent des que le CDN sert le bon fichier.
      v5.15.12 = grille dates alti 4 LIGNES (colonnes de 4, glissement
      horizontal) ; ouverture alti : grille visible 6 s ; clic poignee :
      7 s ; PLUS de flash de la grille au defilement des photos (la
@@ -894,18 +897,22 @@ async function openProfil() {
     wrapEl.classList.add("p3");
     barFlash(1500);                  // v5.15.6 : barre flash 1,5 s a l'ouverture
   }
-  if (!profilData) {
-    try { profilData = await (await fetch(BASE + "/profil.json")).json(); }
-    catch (e) { profilData = { dates: {} }; }
-    const chips = document.getElementById("prChips");
-    chips.innerHTML = "";
-    for (const d of Object.keys(profilData.dates).sort()) {
-      const c = document.createElement("span");
-      c.className = "prChip"; c.textContent = d;
-      c.onclick = () => { prManual.has(d) ? prManual.delete(d) : prManual.add(d);
-                           syncPrDates(); drawProfil(); };
-      chips.appendChild(c);
-    }
+  // v5.15.13 : RECHARGER profil.json a CHAQUE ouverture (cache
+  // contourne) - sinon les dates d'une journee reprocessee pendant
+  // la session (ou servi par le cache CDN/phone) n'apparaissaient
+  // jamais dans les puces tant que la page n'etait pas rechargee.
+  try {
+    profilData = await (await fetch(BASE + "/profil.json",
+                                    { cache: "no-store" })).json();
+  } catch (e) { profilData = { dates: {} }; }
+  const chips = document.getElementById("prChips");
+  chips.innerHTML = "";
+  for (const d of Object.keys(profilData.dates).sort()) {
+    const c = document.createElement("span");
+    c.className = "prChip"; c.textContent = d;
+    c.onclick = () => { prManual.has(d) ? prManual.delete(d) : prManual.add(d);
+                         syncPrDates(); drawProfil(); };
+    chips.appendChild(c);
   }
   syncPrDates();                      // v5.15.10 : manuelles + date photo
   drawProfil();
