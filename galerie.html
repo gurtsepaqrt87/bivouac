@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.15 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.15.1 : chercher "v5.15" (Ctrl+U, Ctrl+F).
+     v5.15.1 = FIX MOBILE : (1) altimetrie en OVERLAY sur la carte
+     (2F photo+carte + ⛰) : puces de dates masquees -> le graphe
+     n'est plus tronque en bas ; (2) bouton ⛰ de la pile reduit
+     (40px) sur smartphone.
      v5.15 = VUES ALTIMETRIE MOBILES (bouton ⛰ dans l'entete) :
      - 1 fenetre : ⛰ = altimetrie PLEIN ECRAN (retour photo par ⇅)
      - 2 fenetres : ⛰ = bas de panneau passe de la CARTE a l'ALTI
@@ -75,7 +79,7 @@
   .mk.sel{z-index:500}
   /* --- contrôles --- */
   #zoom{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:8px;z-index:1000}
-  #zoom button{width:52px;height:52px;font-size:26px;font-weight:700;border-radius:12px;border:2px solid #b35300;background:#ff7a00;color:#fff;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
+    #zoom button{width:52px;height:52px;font-size:26px;font-weight:700;border-radius:12px;border:2px solid #b35300;background:#ff7a00;color:#fff;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
   #zoom button:hover{background:#ffa040}
   #zoom button:active{background:#cc6200}
   /* v5.14 : bouton altimetrie (dans la pile #zoom) + panneau profil */
@@ -155,6 +159,14 @@
        (les zoom +/- restent retires : gestes tactiles) */
     #zoom{display:flex}
     #zoom #zin,#zoom #zout{display:none}
+    /* v5.15.1 : bouton ⛰ de la pile plus discret sur smartphone, et
+       puces de DATES masquees quand l'altimetrie est en OVERLAY sur la
+       carte (2F photo+carte + ⛰) : le panneau ~35% etant petit, les
+       puces tronquaient le bas du graphe. La puce par defaut reste la
+       date du media affiche ; les autres dates restent accessibles via
+       les vues alti pleine hauteur (2F .alti ou 1F plein ecran). */
+    #zoom #btProfil{width:40px;height:40px;font-size:19px}
+    #wrap:not(.alti):not(.showprofil) #profil.on #prChips{display:none}
     /* l'URL/nom de fichier n'apporte rien sur mobile : date deja dans
        le menu, le commentaire reste (bloc #cmt) */
     #cap .nm,#cap .dt{display:none}
