@@ -1,8 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.13.4 : chercher "v5.13" (Ctrl+U, Ctrl+F).
-     v5.13.4 = CLIC MARQUEUR LAPTOP : setPointerCapture redirigeait le
-     click vers la carte, jamais vers le marqueur (hit-test au pointerup).
+<!-- VERSION v5.14 : chercher "v5.14" (Ctrl+U, Ctrl+F).
+     v5.14 = ALTIMETRIE : bouton ⛰ (stack zoom) -> panneau bas de carte
+     (~35%), multi-dates par puces, axe Y dynamique, curseur vertical
+     a l'heure de la photo affichee, clic inverse profil -> photo.
+     Donnees : profil.json genere par build_daily/gerer (v5.2.25).
      v5.13 = PORTRAIT PANORAMABLE : miniatures portraits non recadrees
      (etape1 v5.7, 600 x H), affichees pleine largeur dans le cadre fixe
      avec defilement vertical a la petite main (enablePan).
@@ -60,6 +62,15 @@
   #zoom button{width:52px;height:52px;font-size:26px;font-weight:700;border-radius:12px;border:2px solid #b35300;background:#ff7a00;color:#fff;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
   #zoom button:hover{background:#ffa040}
   #zoom button:active{background:#cc6200}
+  /* v5.14 : bouton altimetrie (dans la pile #zoom) + panneau profil */
+  #zoom button.on{background:#1f77e5;border-color:#123c6e}
+  #profil{position:absolute;left:0;right:0;bottom:0;height:35%;background:#0d1117f2;border-top:2px solid #39445c;z-index:1002;display:none;flex-direction:column}
+  #profil.on{display:flex}
+  #prChips{display:flex;gap:6px;overflow-x:auto;padding:6px 8px;flex:0 0 auto;scrollbar-width:thin}
+  .prChip{padding:4px 10px;border-radius:14px;background:#1c2230;border:1px solid #45526b;color:#eee;font-size:12px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
+  .prChip.on{background:#ff7a00;border-color:#b35300;font-weight:700}
+  #prWrap{flex:1;position:relative;margin:0 8px 8px}
+  #prSvg{width:100%;height:100%;display:block}
   #bar{position:absolute;top:10px;right:10px;display:flex;gap:8px;z-index:1000}
   #bar button{padding:9px 13px;border-radius:9px;border:1px solid #45526b;background:#1c2230ee;color:#eee;font-size:14px;cursor:pointer;backdrop-filter:blur(4px)}
   #bar button:hover{background:#2a3245}
@@ -167,7 +178,11 @@
     <div id="map"><div id="world"></div></div>
     <button id="btFlip" title="Revenir à la photo">⇅</button>
     <button id="btLayoutM" title="Affichage 2 fenêtres">⧉</button>
-    <div id="zoom"><button id="zin" title="Zoom +">+</button><button id="zout" title="Zoom −">−</button></div>
+    <div id="zoom"><button id="zin" title="Zoom +">+</button><button id="zout" title="Zoom −">−</button><button id="btProfil" title="Profil altimétrique">⛰</button></div>
+    <div id="profil">
+      <div id="prChips"></div>
+      <div id="prWrap"><svg id="prSvg"></svg></div>
+    </div>
     <div id="bar">
       <a id="btMap" href="https://umap.openstreetmap.fr/fr/map/cyclo_1463865" target="_blank" title="Ouvrir la carte uMap">🗺 Carte uMap</a>
     </div>
@@ -508,6 +523,7 @@ function openGal(i) {
   // zone admin : pre-remplir le champ commentaire si mode admin
   if (ADM) { document.getElementById("admTxt").value = m.commentaire || ""; }
   // le menu Date suit le media affiche
+  if (profilOn) profilCursor();   // v5.14 : curseur altimetrie suit aussi
   const dSel = document.getElementById("btDate");
   if (dSel.value !== m.date) dSel.value = m.date;
   applySel();
@@ -682,6 +698,141 @@ document.getElementById("btDate").addEventListener("change", e => {
   const i = media.findIndex(m => m.date === e.target.value);
   if (i >= 0) openGal(i);
 });
+// ---------- altimetrie (v5.14) : panneau profil + curseur photo ----------
+// Donnees : profil.json {dates:{jour:[[epoch_s, ele],...]}} genere par
+// build_daily/rebuild_cumul (meme decimation que les traces). Panneau
+// en bas de carte (~35%), multi-dates par puces, axe Y dynamique
+// (min/max de la selection + 15% marge), curseur vertical a l'heure
+// de la photo affichee (nom de fichier horodate), clic inverse :
+// cliquer le profil ouvre la photo la plus proche de cet horodatage.
+let profilData = null, profilOn = false, prDates = new Set(), prMap = null;
+const NSVG = "http://www.w3.org/2000/svg";
+function photoEpoch(m) {
+  const mt = (m.name || "").match(/(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})/);
+  return mt ? Date.UTC(+mt[1], +mt[2] - 1, +mt[3], +mt[4], +mt[5], +mt[6]) : null;
+}
+async function toggleProfil() {
+  profilOn = !profilOn;
+  document.getElementById("profil").classList.toggle("on", profilOn);
+  document.getElementById("btProfil").classList.toggle("on", profilOn);
+  if (!profilOn) return;
+  if (!profilData) {
+    try { profilData = await (await fetch(BASE + "/profil.json")).json(); }
+    catch (e) { profilData = { dates: {} }; }
+    const chips = document.getElementById("prChips");
+    chips.innerHTML = "";
+    for (const d of Object.keys(profilData.dates).sort()) {
+      const c = document.createElement("span");
+      c.className = "prChip"; c.textContent = d;
+      c.onclick = () => { prDates.has(d) ? prDates.delete(d) : prDates.add(d); drawProfil(); };
+      chips.appendChild(c);
+    }
+  }
+  if (!prDates.size && media[sel]) prDates.add(media[sel].date);
+  drawProfil();
+}
+function prColor(date) {
+  const m = media.find(x => x.date === date && x.color);
+  return m ? m.color : "#1f77e5";
+}
+function drawProfil() {
+  document.querySelectorAll(".prChip").forEach(c =>
+    c.classList.toggle("on", prDates.has(c.textContent)));
+  const svg = document.getElementById("prSvg");
+  const W = svg.clientWidth || 320, H = svg.clientHeight || 100;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.innerHTML = ""; prMap = null;
+  if (!profilData || !prDates.size) return;
+  const pts = [];
+  for (const d of prDates) for (const [t, e] of (profilData.dates[d] || []))
+    pts.push({ t: t * 1000, e });
+  pts.sort((a, b) => a.t - b.t);
+  if (pts.length < 2) return;
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  let emin = Infinity, emax = -Infinity;
+  for (const p of pts) { if (p.e < emin) emin = p.e; if (p.e > emax) emax = p.e; }
+  const mg = Math.max(10, (emax - emin) * 0.15);
+  emin -= mg; emax += mg;
+  const X = t => 42 + (t - t0) / (t1 - t0) * (W - 54);
+  const Y = e => H - 16 - (e - emin) / (emax - emin) * (H - 28);
+  prMap = { t0, t1, X, Y, emin, emax };
+  for (let i = 0; i <= 4; i++) {          // grille horizontale + cotes
+    const e = emin + (emax - emin) * i / 4;
+    const ln = document.createElementNS(NSVG, "line");
+    ln.setAttribute("x1", 42); ln.setAttribute("x2", W - 12);
+    ln.setAttribute("y1", Y(e)); ln.setAttribute("y2", Y(e));
+    ln.setAttribute("stroke", "#26304a"); svg.appendChild(ln);
+    const tx = document.createElementNS(NSVG, "text");
+    tx.setAttribute("x", 2); tx.setAttribute("y", Y(e) + 4);
+    tx.setAttribute("fill", "#8a94b0"); tx.setAttribute("font-size", "11");
+    tx.textContent = Math.round(e) + "m"; svg.appendChild(tx);
+  }
+  for (const d of prDates) {              // une courbe par journee
+    const dp = (profilData.dates[d] || [])
+      .map(([t, e]) => X(t * 1000) + "," + Y(e)).join(" ");
+    const pl = document.createElementNS(NSVG, "polyline");
+    pl.setAttribute("points", dp); pl.setAttribute("fill", "none");
+    pl.setAttribute("stroke", prColor(d)); pl.setAttribute("stroke-width", "2");
+    svg.appendChild(pl);
+  }
+  profilCursor();
+}
+function profilCursor() {
+  if (!profilOn || !prMap || !media[sel]) return;
+  const svg = document.getElementById("prSvg");
+  svg.querySelectorAll(".prCur").forEach(x => x.remove());
+  const t = photoEpoch(media[sel]);
+  if (t === null || t < prMap.t0 || t > prMap.t1) return;
+  const x = prMap.X(t);
+  // altitude interpolee du curseur
+  const pts = [];
+  for (const d of prDates) for (const [tt, e] of (profilData.dates[d] || []))
+    pts.push([tt * 1000, e]);
+  pts.sort((a, b) => a[0] - b[0]);
+  let e = pts[0][1];
+  for (let i = 0; i < pts.length; i++)
+    if (pts[i][0] >= t) {
+      if (i === 0) e = pts[0][1];
+      else { const [t1, e1] = pts[i - 1], [t2, e2] = pts[i];
+             e = e1 + (e2 - e1) * (t - t1) / (t2 - t1); }
+      break;
+    }
+  const ln = document.createElementNS(NSVG, "line");
+  ln.setAttribute("class", "prCur");
+  ln.setAttribute("x1", x); ln.setAttribute("x2", x);
+  ln.setAttribute("y1", 4); ln.setAttribute("y2", prMap.Y(prMap.emin));
+  ln.setAttribute("stroke", "#ff7a00"); ln.setAttribute("stroke-width", "2");
+  svg.appendChild(ln);
+  const dot = document.createElementNS(NSVG, "circle");
+  dot.setAttribute("class", "prCur");
+  dot.setAttribute("cx", x); dot.setAttribute("cy", prMap.Y(e));
+  dot.setAttribute("r", 5); dot.setAttribute("fill", "#ff7a00");
+  svg.appendChild(dot);
+  const tx = document.createElementNS(NSVG, "text");
+  tx.setAttribute("class", "prCur");
+  tx.setAttribute("x", Math.min(x + 6, svg.clientWidth - 46));
+  tx.setAttribute("y", prMap.Y(e) - 8);
+  tx.setAttribute("fill", "#ffb066"); tx.setAttribute("font-size", "12");
+  tx.setAttribute("font-weight", "700");
+  tx.textContent = Math.round(e) + "m"; svg.appendChild(tx);
+}
+document.getElementById("prSvg").addEventListener("click", e => {
+  // clic inverse : ouvrir la photo la plus proche de l'horodatage clique
+  if (!prMap) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const t = prMap.t0 + ((e.clientX - r.left) - 42) / (r.width - 54) * (prMap.t1 - prMap.t0);
+  let best = -1, bd = Infinity;
+  for (let i = 0; i < media.length; i++) {
+    const pt = photoEpoch(media[i]);
+    if (pt === null) continue;
+    const d = Math.abs(pt - t);
+    if (d < bd) { bd = d; best = i; }
+  }
+  if (best >= 0 && bd < 90 * 60 * 1000) openGal(best);   // sinon : clic trop loin de toute photo
+});
+document.getElementById("btProfil").onclick = toggleProfil;
+window.addEventListener("resize", () => { if (profilOn) drawProfil(); });
+
 // ---------- glissé sur la photo/video : navigation precedente/suivante ----------
 let swipe = null;
 mediaEl.addEventListener("pointerdown", e => { swipe = { x: e.clientX, y: e.clientY }; });
@@ -784,4 +935,4 @@ load();
 </body>
 </html>
 
-<!-- DOCUMENT FINAL - galerie v5.13.4 - deplacer ce fichier vers galerie.html -->
+<!-- DOCUMENT FINAL - galerie v5.14 - deplacer ce fichier vers galerie.html -->
