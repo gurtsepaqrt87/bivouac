@@ -1,17 +1,18 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.24 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.24 = VERSION DE PROPRETE (2F photo+alti valide) :
-     (1) DEMANDE UTILISATEUR : en 2F photo+alti, la barre du haut
-     (dates, boutons) est TOUJOURS VISIBLE, en flux statique - la
-     fenetre photo est DECALEE dessous (marge gagnee grace a l'alti
-     reduite d'un tiers).
-     (2) RETRAIT du badge/traceur de diagnostic (v5.16.14-23) - il a
-     servi a identifier les micro-paliers de la barre d'URL.
-     Synthese de la serie : alti 2F = 2/3 de hauteur ancree en bas,
-     tracé nav borne a la zone visible, seuil 20 px + filet settle
-     800 ms, rotation immediate.
+<!-- VERSION v5.16.25 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.25 = (2F photo+alti UNIQUEMENT) :
+     (1) fenetre PHOTO EPINGLEE EN PIXELS (40 % du wrap) dans le
+     trace complet - sa hauteur ne varie plus, quelle que soit la
+     photo (paysage OU portrait) ; les hauteurs % etaient
+     contournables par le mode .tall des portraits.
+     (2) poignee orange ⌄ MASQUEE (display:none) : la barre du
+     haut est FIXE dans ce mode, elle reaparaissait ~1 s apres
+     chaque photo (flash "baron" qui expire).
+     v5.16.24 = barre du haut fixe en 2F alti + retrait traceur.
      v5.16.23 = alti reduite d'un tiers + tracé final garanti.
+     Synthese serie : alti 2F = 2/3 ancree en bas, seuil 20 px +
+     filet settle 800 ms, rotation immediate, tracé nav borne.
      v5.16.22 = seuil 20 px (micro-paliers de 4 px ignores).
      v5.16.21 = delai 1000 ms (insuffisant : cadences variables).
      v5.16.20 = rotation immediate / hauteur differee (regle largeur).
@@ -272,6 +273,10 @@
        cherche la navigation */
     #side{position:relative}
     #wrap:not(.single):not(.baron) #shHandle{display:flex}
+    /* v5.16.25 : en 2F photo+alti, la barre du haut est FIXE -> la
+       poignee orange ⌄ est INUTILE (elle reaparaissait ~1 s apres
+       chaque changement de photo, quand le flash "baron" expire) */
+    #wrap.alti #shHandle{display:none !important}
     /* v5.15.6 : puces de DATES de l'alti = aussi FLOTTANTES (par-dessus
        le haut du graphe, 0,5 s a chaque changement de photo) - le
        graphe garde toute sa hauteur, plus de troncature */
@@ -1038,6 +1043,7 @@ function closeProfil() {
   pan.classList.remove("chipsbar");
   pan.style.height = "";            // v5.16.4 : la prochaine ouverture recalcule
   pan.style.flex = ""; pan.style.marginTop = "";   // v5.16.23 : retablir le flux
+  side.style.height = ""; side.style.flex = "";    // v5.16.25 : fenetre photo
   lastPrMode = null;                // v5.16.11 : re-mesure a la prochaine ouverture
   document.getElementById("prChips").classList.remove("show");
   pan.classList.remove("on");
@@ -1121,11 +1127,16 @@ function drawProfil(full) {
     pan.style.height = (wrapEl.classList.contains("showmap")
                         ? Math.round(mwH * 0.35) : mwH) + "px";
   } else if (wrapEl.classList.contains("alti")) {
-    // v5.16.23 (demande utilisateur) : en 2F photo+alti, hauteur du
-    // panneau REDUITE D'UN TIERS (2/3 du conteneur, ancree en bas) -
-    // graphe plus compact = echelle moins sensible aux micro-variations
-    // de hauteur de la barre d'URL. Plus aucun flex:1 : hauteur px fixee
-    // par tracé (comme les autres modes), bord inferieur aligne au bas.
+    // v5.16.25 : la fenetre PHOTO est egalement EPINGLEE EN PIXELS
+    // (40% du wrap) - meme technique que le panneau alti (v5.16.23) :
+    // les hauteurs % de ce mode etaient les unes apres les autres
+    // contournables ; en px, la fenetre photo ne peut PLUS varier,
+    // quel que soit le type de photo (paysage ou portrait) - fini la
+    // photo recroquevillee avec commentaire remonte et zone noire.
+    side.style.flex = "none";
+    side.style.height = Math.round(wrapEl.clientHeight * 0.40) + "px";
+    // v5.16.23 (demande utilisateur) : hauteur du panneau REDUITE
+    // D'UN TIERS (2/3 du conteneur, ancree en bas).
     pan.style.flex = "none";
     pan.style.marginTop = "auto";
     pan.style.height = Math.round(mwH * 2 / 3) + "px";
