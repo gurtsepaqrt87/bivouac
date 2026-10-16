@@ -1,13 +1,15 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.19 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.19 = FIX "remontee 58m -> 3m" (badge v5.16.18 : CNT [nav] a
-     H=412 cache alors que la zone visible etait ~312 - barre d'URL
-     revenue) : le SVG debordait du bas visible, le "3m" etait rogne.
-     Le tracé de navigation est desormais BORNE a la hauteur VISIBLE
-     reelle au moment du trace - le graphe reste entier, le tracé
-     [size] deboucne n'ajuste ensuite que la hauteur definitive.
+<!-- VERSION v5.16.20 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.20 = FIX rafales [size] a vitesse VARIABLE : les badges
+     v5.16.18/19 ont montre des paliers d'animation de barre d'URL a
+     ~140 ms PUIS a ~440 ms - aucun delai fixe ne convient. Regle :
+     largeur changee = rotation -> tracé IMMEDIAT ; seule la hauteur
+     bouge (barre d'URL) -> differe 600 ms RE-ARME par chaque palier,
+     un SEUL tracé a la stabilisation, quelle que soit la vitesse.
+     Complète le bornage a la zone visible de la v5.16.19.
      Badge diagnostic conserve (retrait apres validation).
+     v5.16.19 = tracé de navigation borne a la hauteur VISIBLE.
      v5.16.18 = debounce 400 ms (paliers ~140 ms absorbes).
      v5.16.17 = badge enrichi (em, dates, sources).
      v5.16.16 = debounce unifie resize + ResizeObserver (120 ms).
@@ -1358,22 +1360,39 @@ document.getElementById("hdAlti").onclick = toggleAlti;
 // (H decroissant 330->311 par paliers). Fix : debounce porte a 400 ms
 // (les paliers ~140 ms le re-arment en continu, l'animation est
 // entierement absorbee) + un seul tracé a la stabilisation.
-let roT = null, roLastH = -1, roLastW = -1;
-function sizeSettledRedraw() {
-  if (roT) clearTimeout(roT);
+// v5.16.20 : les badges v5.16.18/19 ont montre des animations de barre
+// d'URL a vitesse VARIABLE (paliers ~140 ms une fois, ~440 ms une autre)
+// - AUCUN delai fixe ne peut absorber les deux. Regle robuste :
+//  - LARGEUR changee = ROTATION -> redessin IMMEDIAT ;
+//  - seule la HAUTEUR bouge (barre d'URL : largeur constante) ->
+//    differe 600 ms, RE-ARME par chaque palier : l'animation, quelle
+//    que soit sa vitesse, ne declenche qu'UN SEUL tracé a la fin.
+let roT = null, roLastH = -1, roLastW = -1, sizeW = -1;
+function sizeSettledRedraw(wChanged) {
+  if (roT) { clearTimeout(roT); roT = null; }
+  if (wChanged) {
+    if (profilOn) { lastPrMode = null; prDbgSrc = "size"; drawProfil(); }
+    return;
+  }
   roT = setTimeout(() => {
     roT = null;
     if (profilOn) { lastPrMode = null; prDbgSrc = "size"; drawProfil(); }
-  }, 400);   // > 3x l'intervalle des paliers d'animation (~140 ms)
+  }, 600);
 }
-window.addEventListener("resize", () => { lastPrMode = null; sizeSettledRedraw(); });
+window.addEventListener("resize", () => {
+  lastPrMode = null;
+  const w = window.innerWidth;
+  sizeSettledRedraw(w !== sizeW);
+  sizeW = w;
+});
 new ResizeObserver(entries => {
   if (!profilOn) return;
   const r = entries[0].contentRect;
   const h = Math.round(r.height), w = Math.round(r.width);
   if (h === roLastH && w === roLastW) return;
+  const wChanged = w !== roLastW;
   roLastH = h; roLastW = w;
-  sizeSettledRedraw();
+  sizeSettledRedraw(wChanged);
 })
   .observe(document.getElementById("profil"));
 
