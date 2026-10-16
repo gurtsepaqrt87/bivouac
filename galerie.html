@@ -1,16 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.4 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.4 = 2 FIX DE FOND :
-     (1) CENTRAGE : le pointeur actif est desormais centre dans la
-     zone VISIBLE de la carte (au-dessus du panneau alti) et non dans
-     le conteneur entier - en 3F le panneau recouvrait le bas, le
-     pointeur paraissait decale "comme en 2F" ; s'applique aussi a
-     l'overlay laptop.
-     (2) TRONCATURE ALTI : hauteur du panneau fixee EN PIXELS a chaque
-     ouverture (40% 3F, 35% overlay, 100% 1F) et purge a la fermeture
-     - plus aucune dependance au chemin suivi (1F alti -> 2F -> 3F ne
-     laisse plus de tracé perimé).
+<!-- VERSION v5.16.5 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.5 = CRITIQUE : v5.16.4 cassait TOUTE la page (photo vide,
+     carte bleue sans tuiles) - render() testait la variable profilOn,
+     declaree PLUS BAS dans le script, alors que render() est appele
+     AVANT (updateSingle a l'initialisation) -> ReferenceError TDZ.
+     Le test est desormais DOM (pan .on), sans variable.
+     v5.16.4 = cadrage zone visible + hauteur alti en pixels.
      v5.16.3 = purge du graphe SVG a la fermeture.
      v5.16.2 = redessin differe (rAF + 150 ms) + ResizeObserver panneau.
      v5.16.1 = boutons ⇅/⧉ alti 1F en z-index 1600.
@@ -503,9 +499,15 @@ function render() {
   // au-dessus du panneau - sinon le pointeur actif est centre dans le
   // conteneur ENTIER et parait decale vers le bas ("comme en 2F").
   let profH = 0;
-  if (profilOn && !wrapEl.classList.contains("alti")
+  // v5.16.5 : test DOM (pas la variable profilOn, declaree PLUS BAS
+  // dans le script : render() est appele AVANT sa declaration a
+  // l'initialisation -> ReferenceError TDZ qui tuait TOUTE la page :
+  // ni photos ni tuiles, seuls les boutons restaient)
+  const panP = document.getElementById("profil");
+  if (panP && panP.classList.contains("on")
+      && !wrapEl.classList.contains("alti")
       && !wrapEl.classList.contains("showprofil"))
-    profH = document.getElementById("profil").offsetHeight || 0;
+    profH = panP.offsetHeight || 0;
   ox = lon2x(clon, zoom) - mapEl.clientWidth / 2;
   oy = lat2y(clat, zoom) - (mapEl.clientHeight - profH) / 2;
   world.style.transform = "translate(" + (-ox) + "px," + (-oy) + "px)";
