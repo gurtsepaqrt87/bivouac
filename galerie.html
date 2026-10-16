@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.5 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.5 = CRITIQUE : v5.16.4 cassait TOUTE la page (photo vide,
-     carte bleue sans tuiles) - render() testait la variable profilOn,
-     declaree PLUS BAS dans le script, alors que render() est appele
-     AVANT (updateSingle a l'initialisation) -> ReferenceError TDZ.
-     Le test est desormais DOM (pan .on), sans variable.
+<!-- VERSION v5.16.6 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.6 = TRONCATURE ALTI 3F : la hauteur du panneau est
+     desormais RECALCULEE PAR drawProfil A CHAQUE TRACE (d'apres les
+     classes courantes : 100% 1F alti, 35% overlay/1F carte, 40% 3F,
+     plein mapwrap en 2F alti) - le calcul unique a l'ouverture etait
+     contournable selon le chemin (1F alti -> 2F -> 3F) ; les
+     redessins sync + rAF + 150 ms auto-corrigent desormais.
+     v5.16.5 = CRITIQUE : fix TDZ render()/profilOn (page vide).
      v5.16.4 = cadrage zone visible + hauteur alti en pixels.
      v5.16.3 = purge du graphe SVG a la fermeture.
      v5.16.2 = redessin differe (rAF + 150 ms) + ResizeObserver panneau.
@@ -193,6 +195,9 @@
   #wrap.alti #map{display:none}
   #wrap.alti #zoom,#wrap.alti #bar,#wrap.alti #btLayoutM{display:none}
   #wrap.alti #profil{display:flex;position:relative;height:auto;flex:1;border-top:none}
+  /* v5.16.6 : la hauteur REELLE du panneau alti est fixee en px par
+     drawProfil a chaque trace ; height:auto ci-dessus n'est qu'un
+     état propre avant le premier trace (drawProfil ecrase via style) */
   /* empilement portrait : galerie au-dessus (55%), carte dessous */
   @media (orientation: portrait) and (max-width:820px){
     #wrap{flex-direction:column}
@@ -944,28 +949,19 @@ async function openProfil() {
   const pan = document.getElementById("profil");
   pan.classList.add("on");
   document.getElementById("btProfil").classList.add("on");
-  // v5.16.4 : hauteur du panneau fixee en PIXELS a l'ouverture (35%,
-  // 40% ou 100% du conteneur carte selon la vue) - les hauteurs CSS
-  // en % laissaient des tracés perimés selon le chemin suivi (cas
-  // reel : 1F alti plein ecran -> 2F -> 3F = alti tronquee ; le chemin
-  // par 1F carte n'etait pas affecté). En px + ResizeObserver, le
-  // trace est TOUJOURS coherent avec la hauteur reellement affichee.
-  const mwH = document.getElementById("mapwrap").clientHeight;
-  if (wrapEl.classList.contains("single")) {
-    pan.style.height = (wrapEl.classList.contains("showmap")
-                        ? Math.round(mwH * 0.35) : mwH) + "px";
-  } else if (!wrapEl.classList.contains("alti")) {
+  // v5.16.6 : ici on n'ajoute QUE les classes de mode ; la HAUTEUR du
+  // panneau est calculee par drawProfil lui-meme a CHAQUE trace (sync
+  // + rAF + 150 ms), d'apres les classes courantes du wrap - quel que
+  // soit le chemin suivi (1F alti -> 2F -> 3F compris), la hauteur
+  // correspond toujours au mode affiche, plus d'alti tronquee.
+  if (!wrapEl.classList.contains("single")
+      && !wrapEl.classList.contains("alti")) {
     if (MOBILE) {
-      // overlay alti sur la carte en 2F smartphone ("3 fenetres")
-      wrapEl.classList.add("p3");
-      pan.style.height = Math.round(mwH * 0.40) + "px";
+      wrapEl.classList.add("p3");   // "3 fenetres" smartphone
       barFlash(1500);                // v5.15.6 : barre flash 1,5 s a l'ouverture
       centerActive();                // v5.16 : carte centree sur la photo affichee
-    } else {
-      pan.style.height = Math.round(mwH * 0.35) + "px";   // laptop : overlay 35%
     }
-  } else {
-    pan.style.height = "";           // mode 2F photo+alti : CSS flex:1 gouverne
+    // laptop : overlay simple, aucune classe supplementaire
   }
   if (!profilData) {
     try { profilData = await (await fetch(BASE + "/profil.json")).json(); }
@@ -1048,6 +1044,23 @@ function prColor(date) {
 function drawProfil() {
   document.querySelectorAll(".prChip").forEach(c =>
     c.classList.toggle("on", prDates.has(c.textContent)));
+  const pan = document.getElementById("profil");
+  const mwH = document.getElementById("mapwrap").clientHeight;
+  // v5.16.6 : hauteur du panneau RECALCULEE A CHAQUE TRACE, d'apres
+  // les classes COURANTES du wrap - plus de calcul unique a l'ouverture
+  // (le calcul unique etait contournable selon le chemin suivi :
+  // 1F alti -> 2F -> 3F laissait une alti tronquee ; les redessins
+  // differes rAF/150 ms appliquent la meme logique et auto-corrigent).
+  if (wrapEl.classList.contains("single")) {
+    pan.style.height = (wrapEl.classList.contains("showmap")
+                        ? Math.round(mwH * 0.35) : mwH) + "px";
+  } else if (wrapEl.classList.contains("alti")) {
+    pan.style.height = mwH + "px";       // 2F photo+alti : plein mapwrap
+  } else if (wrapEl.classList.contains("p3")) {
+    pan.style.height = Math.round(mwH * 0.40) + "px";   // 3F smartphone
+  } else {
+    pan.style.height = Math.round(mwH * 0.35) + "px";   // overlay laptop
+  }
   const svg = document.getElementById("prSvg");
   const W = svg.clientWidth || 320, H = svg.clientHeight || 100;
   svg.setAttribute("viewBox", "0 0 " + W + " " + H);
