@@ -1,12 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.6 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.6 = TRONCATURE ALTI 3F : la hauteur du panneau est
-     desormais RECALCULEE PAR drawProfil A CHAQUE TRACE (d'apres les
-     classes courantes : 100% 1F alti, 35% overlay/1F carte, 40% 3F,
-     plein mapwrap en 2F alti) - le calcul unique a l'ouverture etait
-     contournable selon le chemin (1F alti -> 2F -> 3F) ; les
-     redessins sync + rAF + 150 ms auto-corrigent desormais.
+<!-- VERSION v5.16.7 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.7 = TRONCATURE ALTI 3F (2e tentative, DEFENSIVE) : le SVG
+     est desormais dimensionne en PIXELS EXPLICITES d'apres le RECTANGLE
+     REEL du panneau (getBoundingClientRect), BORNE par le bas du
+     conteneur carte - si un etat residuel fausse encore la hauteur du
+     panneau (1F alti -> 2F -> 3F), le graphe est au pire plus PETIT,
+     jamais coupe. Complète le recalcul par mode de la v5.16.6.
+     v5.16.6 = hauteur panneau recalculee par drawProfil a chaque trace.
      v5.16.5 = CRITIQUE : fix TDZ render()/profilOn (page vide).
      v5.16.4 = cadrage zone visible + hauteur alti en pixels.
      v5.16.3 = purge du graphe SVG a la fermeture.
@@ -1062,7 +1063,22 @@ function drawProfil() {
     pan.style.height = Math.round(mwH * 0.35) + "px";   // overlay laptop
   }
   const svg = document.getElementById("prSvg");
-  const W = svg.clientWidth || 320, H = svg.clientHeight || 100;
+  // v5.16.7 : mesurer le RECTANGLE REEL du panneau (getBoundingClientRect)
+  // et piloter le SVG en PIXELS EXPLICITES, BORNES par le bas du
+  // conteneur carte - quel que soit l'etat de hauteur (sain ou residuel
+  // d'un passage en 1F alti), le graphe ne peut PLUS deborder : au pire
+  // il est legerement plus petit, jamais coupe.
+  const rPan = pan.getBoundingClientRect();
+  const rMw = document.getElementById("mapwrap").getBoundingClientRect();
+  const chipsEl = document.getElementById("prChips");
+  const chipsH = getComputedStyle(chipsEl).position !== "absolute"
+                 ? chipsEl.offsetHeight : 0;
+  let H = Math.round(rPan.height) - chipsH - 12;
+  const maxH = Math.round(rMw.bottom - rPan.top) - 12;   // butee bas de carte
+  if (H > maxH) H = maxH;
+  if (H < 60) H = 60;
+  const W = Math.max(120, Math.round(rPan.width) - 16);
+  svg.style.width = W + "px"; svg.style.height = H + "px";
   svg.setAttribute("viewBox", "0 0 " + W + " " + H);
   svg.innerHTML = ""; prMap = null;
   if (!profilData || !prDates.size) return;
