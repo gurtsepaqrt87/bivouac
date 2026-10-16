@@ -1,13 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.26 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.26 = (2F photo+alti UNIQUEMENT) CORRECTION REGRESSION
-     v5.16.25 : la fenetre photo epinglee en px (40 %) rendait la
-     boite media trop basse pour un paysage -> max-height reduisait
-     sa LARGEUR (letterbox lateral, barres noires laterales).
-     Fix : en .alti, TOUTES les photos (paysage OU portrait) sont
-     rendues PLEINE LARGEUR ; enablePan gere le debordement vertical
-     (badge "glisser") et retire .tall seul si la photo tient.
+<!-- VERSION v5.16.27 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.27 = (2F photo+alti) CORRECTION REGRESSION v5.16.26 :
+     sur une image DEJA EN CACHE, "load" se declenche avant
+     l'abonnement (course) -> enablePan jamais appele -> la
+     regle pleine largeur ne s'appliquait pas (paysage letterbox
+     lateral). Filet : si complete au retour de openGal, activer
+     enablePan direct (il retire .tall seul si la photo tient).
+     v5.16.26 = (2F alti) toutes les photos PLEINE LARGEUR,
+     enablePan gere le debordement vertical (badge "glisser").
      v5.16.25 = fenetre photo epinglee en px (40 %) + poignee ⌄ masquee.
      v5.16.24 = barre du haut fixe en 2F alti + retrait traceur.
      v5.16.23 = alti reduite d'un tiers + tracé final garanti.
@@ -679,6 +680,7 @@ function fitSideToMedia(el, isVideo) {
 // v5.13.1 : badge d'invitation au glissement - le curseur grab est
 // invisible sur Android ; ce badge visible pulse jusqu'au 1er glissement.
 function enablePan(el) {
+  if (el.classList.contains("tall")) return;   // v5.16.27 : idempotent
   el.classList.add("tall");
   const box = mediaEl;
   let top = 0, y0 = null, hint = null, hintTimer = null;
@@ -739,12 +741,22 @@ function openGal(i) {
     // enablePan retire .tall tout seul si la photo tient entier et
     // affiche sinon le badge "glisser" (parties tronquees).
     el.addEventListener("load", () => {
+      // v5.16.26 : en 2F photo+alti, TOUTES les photos PLEINE
+      // LARGEUR ; enablePan retire .tall seul si la photo tient et
+      // affiche sinon le badge "glisser" (parties tronquees).
       if (el.naturalHeight > el.naturalWidth
           || wrapEl.classList.contains("alti")) enablePan(el);
     });
     fitSideToMedia(el, false);
   }
   mediaEl.appendChild(el);
+  // v5.16.27 : filet de secours - si l'image est deja en cache, son
+  // evenement "load" peut se declencher AVANT l'abonnement (course)
+  // et enablePan n'a jamais ete appelee : photo PLEINE LARGEUR non
+  // appliquee en 2F alti (letterbox lateral sur paysage en cache).
+  if (el.complete && el.naturalWidth
+      && wrapEl.classList.contains("alti")
+      && !el.classList.contains("tall")) enablePan(el);
   capTxt.textContent = m.name;
   capDate.textContent = m.date;
   const cmtEl = document.getElementById("cmt");
