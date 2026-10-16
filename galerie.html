@@ -1,12 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.7 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.7 = TRONCATURE ALTI 3F (2e tentative, DEFENSIVE) : le SVG
-     est desormais dimensionne en PIXELS EXPLICITES d'apres le RECTANGLE
-     REEL du panneau (getBoundingClientRect), BORNE par le bas du
-     conteneur carte - si un etat residuel fausse encore la hauteur du
-     panneau (1F alti -> 2F -> 3F), le graphe est au pire plus PETIT,
-     jamais coupe. Complète le recalcul par mode de la v5.16.6.
+<!-- VERSION v5.16.8 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.8 = TRONCATURE ALTI 2F photo+alti (meme famille que 3F) :
+     (1) hauteur panneau mesuree via getBoundingClientRect (force le
+     reflow, contrairement a clientHeight qui rendait une valeur
+     PERIMEE apres le changement de layout 1F -> 2F) ; (2) borne du
+     SVG AUSSI PAR LE HAUT : si le panneau depasse au-dessus du
+     conteneur (hauteur residuelle), le graphe est redimensionne a
+     la zone VISIBLE - plus de bas coupe, quel que soit le chemin.
+     v5.16.7 = SVG en pixels explicites, borne par le bas du conteneur.
      v5.16.6 = hauteur panneau recalculee par drawProfil a chaque trace.
      v5.16.5 = CRITIQUE : fix TDZ render()/profilOn (page vide).
      v5.16.4 = cadrage zone visible + hauteur alti en pixels.
@@ -1046,7 +1048,12 @@ function drawProfil() {
   document.querySelectorAll(".prChip").forEach(c =>
     c.classList.toggle("on", prDates.has(c.textContent)));
   const pan = document.getElementById("profil");
-  const mwH = document.getElementById("mapwrap").clientHeight;
+  // v5.16.8 : mesurer via getBoundingClientRect (force le reflow au
+  // moment de la lecture, contrairement a clientHeight qui peut rendre
+  // une valeur PERIMEE si le layout vient de changer - racine de la
+  // troncature 2F photo+alti apres passage en 1F alti).
+  const rMw0 = document.getElementById("mapwrap").getBoundingClientRect();
+  const mwH = Math.round(rMw0.height);
   // v5.16.6 : hauteur du panneau RECALCULEE A CHAQUE TRACE, d'apres
   // les classes COURANTES du wrap - plus de calcul unique a l'ouverture
   // (le calcul unique etait contournable selon le chemin suivi :
@@ -1074,7 +1081,13 @@ function drawProfil() {
   const chipsH = getComputedStyle(chipsEl).position !== "absolute"
                  ? chipsEl.offsetHeight : 0;
   let H = Math.round(rPan.height) - chipsH - 12;
-  const maxH = Math.round(rMw.bottom - rPan.top) - 12;   // butee bas de carte
+  // v5.16.8 : borne aussi par le HAUT - si le panneau (absolute,
+  // bottom:0) depasse au-dessus du conteneur (hauteur residuelle trop
+  // grande), la partie visible commence au top du conteneur : sans
+  // cette borne le SVG etait trace plus haut que la zone visible et
+  // son bas etait coupe (cas 2F photo+alti apres 1F alti).
+  const visTop = Math.max(rPan.top, rMw.top);
+  const maxH = Math.round(rMw.bottom - visTop) - 12;    // butee bas de carte
   if (H > maxH) H = maxH;
   if (H < 60) H = 60;
   const W = Math.max(120, Math.round(rPan.width) - 16);
