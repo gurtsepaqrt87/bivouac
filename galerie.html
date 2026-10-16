@@ -1,18 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.15.13 : chercher "v5.15" (Ctrl+U, Ctrl+F).
-     v5.15.13 = FIX dates manquantes : profil.json RECHARGE a chaque
-     ouverture de l'alti, cache contourne (no-store) - les journees
-     reprocessees apparaissent des que le CDN sert le bon fichier.
-     v5.15.12 = grille dates alti 4 LIGNES (colonnes de 4, glissement
-     horizontal) ; ouverture alti : grille visible 6 s ; clic poignee :
-     7 s ; PLUS de flash de la grille au defilement des photos (la
-     poignee reste le seul rappel) ; suivi auto de la date photo et
-     statique des dates manuelles (v5.15.10) conserves.
-     v5.15.11 = puces de dates alti en GRILLE : 3 LIGNES, colonnes
-     de 3 dates (glissement horizontal pour les colonnes suivantes)
-     -> toutes les dates voisines visibles d'un coup d'oeil ;
-     temporisation poignee portee a 5 s.
+<!-- VERSION v5.16 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16 = (1) ouverture smartphone : mode "3 FENETRES" par defaut
+     (photo+carte+alti, comme si ⛰ de la carte etait active) ;
+     (2) en 3F : carte RECENTREE sur la photo affichee + marqueurs
+     reduits d'1/3 (2F photo+carte inchange) ; (3) monofenetre alti :
+     bouton retour ⇅ (manquant) ; (4) butee ZMAX 18->16 (anti "page
+     bleue" a zoom max) ; (5) bouton 🛰 vue SATELLITE (tuiles Esri
+     World Imagery) sur smartphone ET laptop.
+     v5.15.12 = grille dates alti 4 lignes (ouverture 6 s, poignee 7 s).
      v5.15.10 = la DATE ALTI SUIT la date PHOTO : changer la journee
      via le menu du haut passiverise l'ancienne date auto dans l'alti
      et active la nouvelle (selection = puces cochees a la main U
@@ -165,6 +161,9 @@
   #wrap.single.showmap #side{display:none}
   #wrap.single.showmap #mapwrap{flex:1}
   #wrap.single.showmap #btFlip{display:flex;position:absolute;left:10px;bottom:14px;z-index:1001;width:46px;height:46px;border-radius:12px;border:2px solid #b35300;background:#ff7a00cc;color:#fff;font-size:22px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
+  /* v5.16 : meme bouton retour ⇅ en MONOFENETRE ALTIMETRIE (il manquait
+     - seul ecran sans retour vers la photo) */
+  #wrap.single.showprofil #btFlip{display:flex;position:absolute;left:10px;bottom:14px;z-index:1001;width:46px;height:46px;border-radius:12px;border:2px solid #b35300;background:#ff7a00cc;color:#fff;font-size:22px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
   #wrap.single.showmap #btFlip:hover{background:#ffa040}
   /* v5.15 : ALTI PLEIN ECRAN en 1F (bouton ⛰ de l'entete photo) -
      le panneau #profil (dans #mapwrap) remplace TOUT : map masquee */
@@ -208,7 +207,7 @@
        puces tronquaient le bas du graphe. La puce par defaut reste la
        date du media affiche ; les autres dates restent accessibles via
        les vues alti pleine hauteur (2F .alti ou 1F plein ecran). */
-    #zoom #btProfil{width:40px;height:40px;font-size:19px}
+    #zoom #btProfil,#zoom #btSat{width:40px;height:40px;font-size:19px}
     #wrap:not(.alti):not(.showprofil) #profil.on #prChips{padding-top:6px}
     /* v5.15.3 : cas "3 fenetres" (2F photo+carte + ⛰ overlay) : photo
        masquee, barre du haut FLOTTANTE translucide par-dessus la carte,
@@ -242,6 +241,11 @@
     #prClose{display:none}
     #wrap.p3 #prClose{display:flex;position:absolute;top:6px;right:8px;z-index:1600;width:36px;height:36px;border-radius:10px;border:2px solid #b35300;background:#ff7a00;color:#fff;font-size:17px;font-weight:700;align-items:center;justify-content:center;cursor:pointer}
     #wrap.p3 #profil{height:40%}
+    /* v5.16 : en mode "3 fenetres" uniquement, marqueurs REDUITS d'1/3
+       (moins intrusifs ; le marqueur selectionne reste agrandi mais
+       reste plus petit qu'en 2F). Le 2F photo+carte est INCHANGE. */
+    #wrap.p3 .mk .icon{transform:scale(.67)}
+    #wrap.p3 .mk.sel .icon{transform:scale(1.1)}
     /* styles communs des poignees ⌄ (barre du haut, puces alti) */
     #shHandle,#prHandle{position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:1501;height:26px;padding:0 14px;border-radius:0 0 10px 10px;border:1px solid #b35300;border-top:none;background:#ff7a00cc;color:#fff;font-size:14px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
     /* l'URL/nom de fichier n'apporte rien sur mobile : date deja dans
@@ -308,7 +312,7 @@
     <div id="map"><div id="world"></div></div>
     <button id="btFlip" title="Revenir à la photo">⇅</button>
     <button id="btLayoutM" title="Affichage 2 fenêtres">⧉</button>
-    <div id="zoom"><button id="zin" title="Zoom +">+</button><button id="zout" title="Zoom −">−</button><button id="btProfil" title="Profil altimétrique">⛰</button></div>
+    <div id="zoom"><button id="zin" title="Zoom +">+</button><button id="zout" title="Zoom −">−</button><button id="btProfil" title="Profil altimétrique">⛰</button><button id="btSat" title="Vue satellite (Esri)">🛰</button></div>
     <div id="profil">
       <button id="prClose" title="Fermer l'altimétrie">✕</button>
       <button id="prHandle" title="Afficher les dates">⌄</button>
@@ -343,7 +347,8 @@ let zoom = 11, clon = -1.85, clat = 48.15;   // centre initial (cadrage auto ens
 let ox = 0, oy = 0;
 let media = [], marks = [], traces = [];
 let sel = -1, userResized = false;   // userResized : l'utilisateur a glisse la poignee -> plus d'ajustement auto
-const ZMIN = 3, ZMAX = 18;
+const ZMIN = 3, ZMAX = 16;   // v5.16 : ZMAX 18->16, butee anti "page
+                             // bleue" (au-dela de 16, tuiles vides/ocean)
 // ---------- contexte d'affichage : laptop OU smartphone ----------
 // "pointer:coarse" = doigt (pas souris) ; petit ecran en plus = mobile.
 // Sert a desactiver l'ajustement auto de largeur (sans objet en portrait)
@@ -380,6 +385,14 @@ function py2lat(py) {
 
 // ---------- tuiles ----------
 const tiles = new Map();
+let sat = false;   // v5.16 : vue satellite (tuiles Esri World Imagery)
+function setSat(v) {
+  sat = v;
+  document.getElementById("btSat").classList.toggle("on", sat);
+  tiles.forEach(img => img.remove());   // vider le cache : autres tuiles
+  tiles.clear();
+  render();
+}
 function renderTiles() {
   const W = mapEl.clientWidth, H = mapEl.clientHeight;
   const x0 = Math.floor(ox / 256), y0 = Math.floor(oy / 256);
@@ -392,7 +405,15 @@ function renderTiles() {
     if (tiles.has(key)) continue;
     const img = document.createElement("img");
     img.className = "tile";
-    img.src = "https://tile.openstreetmap.org/" + key + ".png";
+    // v5.16 : OSM (plan) ou Esri World Imagery (satellite) - Esri :
+    // /tile/{z}/{y}/{x} (y AVANT x, contrairement a OSM)
+    if (sat) {
+      const p = key.split("/");
+      img.src = "https://server.arcgisonline.com/ArcGIS/rest/services/"
+              + "World_Imagery/MapServer/tile/" + p[0] + "/" + p[2] + "/" + p[1];
+    } else {
+      img.src = "https://tile.openstreetmap.org/" + key + ".png";
+    }
     img.style.left = (x * 256) + "px";
     img.style.top = (y * 256) + "px";
     img.draggable = false;
@@ -468,6 +489,14 @@ function render() {
   oy = lat2y(clat, zoom) - mapEl.clientHeight / 2;
   world.style.transform = "translate(" + (-ox) + "px," + (-oy) + "px)";
   renderTiles(); renderTraces(); renderMarkers();
+}
+// v5.16 : recentrer la carte sur le MARQUEUR de la photo affichee
+// (appele a l'entree en mode "3 fenetres" et a chaque photo en 3F)
+function centerActive() {
+  const m = media[sel];
+  if (!m || m.lat == null) return;
+  clon = m.lon; clat = m.lat;
+  render();
 }
 
 // ---------- interactions carte ----------
@@ -655,7 +684,8 @@ function openGal(i) {
   // zone admin : pre-remplir le champ commentaire si mode admin
   if (ADM) { document.getElementById("admTxt").value = m.commentaire || ""; }
   // le menu Date suit le media affiche
-  if (profilOn) { syncPrDates(); drawProfil(); } // v5.15.10 : la date alti suit la photo (v5.15.12 : plus de flash puces au defilement)
+  if (profilOn) { syncPrDates(); drawProfil();
+                 if (wrapEl.classList.contains("p3")) centerActive(); } // v5.16 : recentrage en 3F
   barFlash();                                    // v5.15.6 : barre flottante
   const dSel = document.getElementById("btDate");
   if (dSel.value !== m.date) dSel.value = m.date;
@@ -896,23 +926,20 @@ async function openProfil() {
       && !wrapEl.classList.contains("alti")) {
     wrapEl.classList.add("p3");
     barFlash(1500);                  // v5.15.6 : barre flash 1,5 s a l'ouverture
+    centerActive();                  // v5.16 : carte centree sur la photo affichee
   }
-  // v5.15.13 : RECHARGER profil.json a CHAQUE ouverture (cache
-  // contourne) - sinon les dates d'une journee reprocessee pendant
-  // la session (ou servi par le cache CDN/phone) n'apparaissaient
-  // jamais dans les puces tant que la page n'etait pas rechargee.
-  try {
-    profilData = await (await fetch(BASE + "/profil.json",
-                                    { cache: "no-store" })).json();
-  } catch (e) { profilData = { dates: {} }; }
-  const chips = document.getElementById("prChips");
-  chips.innerHTML = "";
-  for (const d of Object.keys(profilData.dates).sort()) {
-    const c = document.createElement("span");
-    c.className = "prChip"; c.textContent = d;
-    c.onclick = () => { prManual.has(d) ? prManual.delete(d) : prManual.add(d);
-                         syncPrDates(); drawProfil(); };
-    chips.appendChild(c);
+  if (!profilData) {
+    try { profilData = await (await fetch(BASE + "/profil.json")).json(); }
+    catch (e) { profilData = { dates: {} }; }
+    const chips = document.getElementById("prChips");
+    chips.innerHTML = "";
+    for (const d of Object.keys(profilData.dates).sort()) {
+      const c = document.createElement("span");
+      c.className = "prChip"; c.textContent = d;
+      c.onclick = () => { prManual.has(d) ? prManual.delete(d) : prManual.add(d);
+                           syncPrDates(); drawProfil(); };
+      chips.appendChild(c);
+    }
   }
   syncPrDates();                      // v5.15.10 : manuelles + date photo
   drawProfil();
@@ -1099,6 +1126,7 @@ document.getElementById("prSvg").addEventListener("click", e => {
   if (best >= 0 && bd < 90 * 60 * 1000) openGal(best);   // sinon : clic trop loin de toute photo
 });
 document.getElementById("btProfil").onclick = toggleProfil;
+document.getElementById("btSat").onclick = () => setSat(!sat);   // v5.16
 // v5.15 : bouton ⛰ de l'ENTETE (mobile) - deux comportements :
 //  - 1 fenetre : alti PLEIN ECRAN (classe .showprofil), retour photo
 //    par le bouton flottant ⇅ (btFlip)
@@ -1226,6 +1254,12 @@ async function load() {
     if (media.length) {
       const lastDate = [...new Set(media.map(m => m.date))].sort().pop();
       openGal(media.findIndex(m => m.date === lastDate));
+    }
+    // v5.16 : a l'ouverture sur SMARTPHONE (2F), demarrer directement
+    // en mode "3 FENETRES" (photo+carte+alti = bouton ⛰ de la carte actif)
+    if (MOBILE && !wrapEl.classList.contains("single")) {
+      await openProfil();
+      centerActive();
     }
   } catch (e) { fail(e.message); }
 }
