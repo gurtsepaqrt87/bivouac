@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.16.1 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.1 = FIX : boutons ⇅ (retour photo) et ⧉ (retour 2F) en
+     monofenetre alti passes en z-index 1600 - le panneau alti
+     (z-index 1002, height 100%) les recouvait : rendus mais
+     INVISIBLES dessous.
      v5.16 = (1) ouverture smartphone : mode "3 FENETRES" par defaut
      (photo+carte+alti, comme si ⛰ de la carte etait active) ;
      (2) en 3F : carte RECENTREE sur la photo affichee + marqueurs
@@ -175,9 +179,9 @@
      alti plein ecran - c'est le seul moyen d'en sortir sans repasser
      par la photo (btLayoutM est masque via #zoom/#bar mais il est
      PILE-EXTERIEUR : on le reaffiche ici, en bas de l'ecran) */
-  #wrap.single.showprofil #btLayoutM{display:flex}
+  #wrap.single.showprofil #btLayoutM{display:flex;z-index:1600}   /* v5.16.1 : AU-DESSUS du panneau #profil (z-index 1002) */
   #wrap.single.showprofil #profil{display:flex;position:relative;height:100%;border-top:none}
-  #wrap.single.showprofil #btFlip{display:flex;position:absolute;left:10px;bottom:14px;z-index:1001;width:46px;height:46px;border-radius:12px;border:2px solid #b35300;background:#ff7a00cc;color:#fff;font-size:22px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
+  #wrap.single.showprofil #btFlip{display:flex;position:absolute;left:10px;bottom:14px;z-index:1600;width:46px;height:46px;border-radius:12px;border:2px solid #b35300;background:#ff7a00cc;color:#fff;font-size:22px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
   #wrap.single.showprofil #btFlip:hover{background:#ffa040}
   /* v5.15 : en 2F, bas de panneau = ALTIMETRIE (carte masquee, profil
      a pleine hauteur du bas de panneau) -> combo photo + altimetrie */
