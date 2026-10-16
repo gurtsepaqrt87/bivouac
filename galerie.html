@@ -1,17 +1,17 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.23 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.23 = 2 EVOLUTIONS (2F photo+alti) :
-     (1) DEMANDE UTILISATEUR : hauteur de la fenetre alti REDUITE
-     D'UN TIERS (2/3 du conteneur, ancree en bas) - graphe plus
-     compact, moins sensible aux micro-variations de la barre d'URL.
-     (2) FIX "58m rogne persistant" : le seuil 20 px (v5.16.22)
-     supprimait le scintillement MAIS AUSSI le tracé FINAL quand
-     l'etat stable restait a <20 px du dernier tracé -> affichage
-     bloque en etat tronque. Filet : tracé unique "settle" 800 ms
-     apres le dernier micro-palier - pas de tracé intermediaire
-     visible, etat final toujours correct.
-     Badge diagnostic conserve (retrait apres validation).
+<!-- VERSION v5.16.24 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.24 = VERSION DE PROPRETE (2F photo+alti valide) :
+     (1) DEMANDE UTILISATEUR : en 2F photo+alti, la barre du haut
+     (dates, boutons) est TOUJOURS VISIBLE, en flux statique - la
+     fenetre photo est DECALEE dessous (marge gagnee grace a l'alti
+     reduite d'un tiers).
+     (2) RETRAIT du badge/traceur de diagnostic (v5.16.14-23) - il a
+     servi a identifier les micro-paliers de la barre d'URL.
+     Synthese de la serie : alti 2F = 2/3 de hauteur ancree en bas,
+     tracé nav borne a la zone visible, seuil 20 px + filet settle
+     800 ms, rotation immediate.
+     v5.16.23 = alti reduite d'un tiers + tracé final garanti.
      v5.16.22 = seuil 20 px (micro-paliers de 4 px ignores).
      v5.16.21 = delai 1000 ms (insuffisant : cadences variables).
      v5.16.20 = rotation immediate / hauteur differee (regle largeur).
@@ -154,9 +154,6 @@
   .prChip{padding:4px 10px;border-radius:14px;background:#1c2230;border:1px solid #45526b;color:#eee;font-size:12px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
   .prChip.on{background:#ff7a00;border-color:#b35300;font-weight:700}
   #prWrap{flex:1;position:relative;margin:0 8px 8px}
-  /* v5.16.17 : badge diagnostic REACTIVE (le scintillement lent
-     restant n'est pas encore identifié : géométrie ou sélection) */
-  #prDbg{position:absolute;right:10px;bottom:4px;z-index:1700;color:#ffb066;font-size:10px;font-family:monospace;pointer-events:none}
   #prSvg{width:100%;height:100%;display:block}
   #bar{position:absolute;top:10px;right:10px;display:flex;gap:8px;z-index:1000}
   #bar button{padding:9px 13px;border-radius:9px;border:1px solid #45526b;background:#1c2230ee;color:#eee;font-size:14px;cursor:pointer;backdrop-filter:blur(4px)}
@@ -259,6 +256,11 @@
        defaut) par-dessus la photo : le media monte d'autant, la
        hauteur photo+carte est optimisee. Poignee ⌄ pour la rappeler. */
     #wrap:not(.single) #side .sh{position:absolute;top:0;left:0;right:0;z-index:1500;background:#11151dcc;backdrop-filter:blur(4px);border-bottom:1px solid #39445c;opacity:0;pointer-events:none;transition:opacity .3s}
+    /* v5.16.24 (demande utilisateur) : en 2F photo+alti, la barre du
+       haut est TOUJOURS VISIBLE et reprend sa place dans le FLUX
+       (statique) : la fenetre photo est DECALEE dessous - la marge
+       gagnee par l'alti reduite d'un tiers le permet. */
+    #wrap.alti #side .sh{position:static;opacity:1;pointer-events:auto;background:#11151d;border-bottom:1px solid #39445c}
     #wrap:not(.single) #side .sh.show{opacity:1;pointer-events:auto}
     /* v5.15.7 : poignee ⌄ des DATES de l'alti - meme principe que
        celle de la barre du haut (visible quand les puces sont
@@ -358,7 +360,6 @@
       <button id="prHandle" title="Afficher les dates">⌄</button>
       <div id="prChips"></div>
       <div id="prWrap"><svg id="prSvg"></svg></div>
-      <div id="prDbg" title="diagnostic v5.16.17"></div>
     </div>
     <div id="bar">
       <a id="btMap" href="https://umap.openstreetmap.fr/fr/map/cyclo_1463865" target="_blank" title="Ouvrir la carte uMap">🗺 Carte uMap</a>
@@ -739,7 +740,7 @@ function openGal(i) {
   // zone admin : pre-remplir le champ commentaire si mode admin
   if (ADM) { document.getElementById("admTxt").value = m.commentaire || ""; }
   // le menu Date suit le media affiche
-  if (profilOn) { prDbgSrc = "nav"; syncPrDates(); drawProfil(false);   // v5.16.13 : contenu seul au defilement - geometrie immuable
+  if (profilOn) { syncPrDates(); drawProfil(false);   // v5.16.13 : contenu seul au defilement - geometrie immuable
                  if (wrapEl.classList.contains("p3")) centerActive(); }
   barFlash();                                    // v5.15.6 : barre flottante
   const dSel = document.getElementById("btDate");
@@ -951,21 +952,8 @@ let profilData = null, profilOn = false, prDates = new Set(), prMap = null;
 // le mode (classes du wrap) ne change pas, les traces suivants
 // reutilisent la meme hauteur/largeur (stabilite au defilement).
 let lastPrMode = null, lastPrH = 0, lastPrW = 0;
-// v5.16.14 : DIAGNOSTIC - source du trace en cours + historique
-let prDbgSrc = "?", prDbgLog = "";
-function prDbg(kind) {
-  // v5.16.17 : enrichi - dates selectionnees + altitude min du graphe :
-  // distinguera un probleme de GEOMETRIE (H bouge) d'un probleme de
-  // SELECTION (dates/emin changent) pendant le scintillement lent.
-  const ds = [...prDates].sort().join(";");
-  const em = prMap ? Math.round(prMap.emin) : "-";
-  prDbgLog = kind + " H" + lastPrH + " em" + em + " d" + prDates.size
-           + " [" + prDbgSrc + "] " + Math.round(performance.now())
-           + (ds ? " (" + ds.slice(0, 60) + ")" : "") + " | " + prDbgLog;
-  if (prDbgLog.length > 240) prDbgLog = prDbgLog.slice(0, 240);
-  const d = document.getElementById("prDbg");
-  if (d) d.textContent = prDbgLog;
-}
+// (v5.16.14-23 : le badge de diagnostic a servi a identifier les
+// micro-paliers de la barre d'URL ; RETIRE en v5.16.24 sur demande)
 // v5.15.10 : la date alti SUIST la date photo : la selection affichee
 // = dates cochees MANUELLEMENT (puces) U la date de la photo affichee.
 // Changer la date via le menu du haut passiverise l'ancienne date auto
@@ -1018,19 +1006,19 @@ async function openProfil() {
       const c = document.createElement("span");
       c.className = "prChip"; c.textContent = d;
       c.onclick = () => { prManual.has(d) ? prManual.delete(d) : prManual.add(d);
-                           prDbgSrc="chip"; syncPrDates(); drawProfil(); };
+                           syncPrDates(); drawProfil(); };
       chips.appendChild(c);
     }
   }
-  prDbgSrc = "open"; syncPrDates();                      // v5.15.10 : manuelles + date photo
+  syncPrDates();                      // v5.15.10 : manuelles + date photo
   drawProfil();
   chipsFlash(6000);                    // v5.15.12 : grille dates visible 6 s a l'ouverture
   // v5.16.2 : le layout peut se stabiliser APRES le trace (entree en
   // mode 3F, barre flottante, rotation) -> redessiner une 2e fois une
   // fois les dimensions acquises, sinon le SVG garde la hauteur du
   // premier calcul et le bas du graphe est tronque.
-  setTimeout(() => { if (profilOn) { prDbgSrc = "150ms"; drawProfil(); } }, 150);
-  requestAnimationFrame(() => { if (profilOn) { prDbgSrc = "rAF"; drawProfil(); } });
+  setTimeout(() => { if (profilOn) { drawProfil(); } }, 150);
+  requestAnimationFrame(() => { if (profilOn) { drawProfil(); } });
 }
 function closeProfil() {
   profilOn = false;
@@ -1112,7 +1100,6 @@ function drawProfil(full) {
     svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     svg.innerHTML = ""; prMap = null;
     drawProfilContent(svg, W, H);
-    prDbg("CNT");                          // v5.16.17 : APRES le trace (em reel)
     return;
   }
   document.querySelectorAll(".prChip").forEach(c =>
@@ -1195,7 +1182,6 @@ function drawProfil(full) {
   svg.setAttribute("viewBox", "0 0 " + W + " " + H);
   svg.innerHTML = ""; prMap = null;
   drawProfilContent(svg, W, H);
-  prDbg("FULL");                            // v5.16.17 : APRES le trace (em reel)
   lastDrawnH = H;                           // v5.16.22 : reference du seuil 20 px
 }
 // v5.16.13 : corps de tracé commun (plein et contenu-seul)
@@ -1385,7 +1371,7 @@ function sizeSettledRedraw(h, w) {
   if (!profilOn) return;
   if (wChanged || hDelta >= 20) {
     if (settleT) { clearTimeout(settleT); settleT = null; }
-    lastPrMode = null; prDbgSrc = "size"; drawProfil();   // lastDrawnH mis a jour par drawProfil
+    lastPrMode = null; drawProfil();   // lastDrawnH mis a jour par drawProfil
   } else {
     // v5.16.23 : le seuil de 20 px supprimait le scintillement MAIS
     // aussi le tracé FINAL (si l'etat stable est a <20 px du dernier
@@ -1396,7 +1382,7 @@ function sizeSettledRedraw(h, w) {
     if (settleT) clearTimeout(settleT);
     settleT = setTimeout(() => {
       settleT = null;
-      if (profilOn) { lastPrMode = null; prDbgSrc = "settle"; drawProfil(); }
+      if (profilOn) { lastPrMode = null; drawProfil(); }
     }, 800);
   }
 }
