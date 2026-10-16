@@ -1,12 +1,16 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.21 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.21 = delai hauteur-seule porte a 1000 ms : les intervalles
-     de paliers de la barre d'URL VARIENT avec le contexte (140, 440
-     puis 640 ms d'apres les badges successifs) - chaque delai fixe
-     choisi etait depasse au coup suivant. 1000 ms > tous les
-     intervalles observes ; rotation (largeur) reste IMMEDIATE.
+<!-- VERSION v5.16.22 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.22 = FIX PAR SEUIL D'AMPLITUDE (cause racine identifiee :
+     les badges montraient des micro-paliers de 4 PX seulement -
+     311->314->318->322->326->330 - la barre d'URL anime le panneau
+     par micro-pas, chaque micro-pas declenchant un tracé FULL quelle
+     que soit sa cadence, d'ou l'echec des debounces 120/400/600/1000
+     ms). Desormais : ne retracer que si l'ecart de hauteur atteint
+     20 PX depuis le dernier tracé (micro-paliers ignores) ; rotation
+     (largeur) reste IMMEDIATE. Plus AUCUN delai a ajuster.
      Badge diagnostic conserve (retrait apres validation).
+     v5.16.21 = delai 1000 ms (insuffisant : cadences variables).
      v5.16.20 = rotation immediate / hauteur differee (regle largeur).
      v5.16.19 = tracé de navigation borne a la hauteur VISIBLE.
      v5.16.18 = debounce 400 ms (paliers ~140 ms absorbes).
@@ -1186,6 +1190,7 @@ function drawProfil(full) {
   svg.innerHTML = ""; prMap = null;
   drawProfilContent(svg, W, H);
   prDbg("FULL");                            // v5.16.17 : APRES le trace (em reel)
+  lastDrawnH = H;                           // v5.16.22 : reference du seuil 20 px
 }
 // v5.16.13 : corps de tracé commun (plein et contenu-seul)
 function drawProfilContent(svg, W, H) {
@@ -1359,42 +1364,31 @@ document.getElementById("hdAlti").onclick = toggleAlti;
 // (H decroissant 330->311 par paliers). Fix : debounce porte a 400 ms
 // (les paliers ~140 ms le re-arment en continu, l'animation est
 // entierement absorbee) + un seul tracé a la stabilisation.
-// v5.16.20 : les badges v5.16.18/19 ont montre des animations de barre
-// d'URL a vitesse VARIABLE (paliers ~140 ms une fois, ~440 ms une autre)
-// - AUCUN delai fixe ne peut absorber les deux. Regle robuste :
-//  - LARGEUR changee = ROTATION -> redessin IMMEDIAT ;
-//  - seule la HAUTEUR bouge (barre d'URL : largeur constante) ->
-//    differe 600 ms, RE-ARME par chaque palier : l'animation, quelle
-//    que soit sa vitesse, ne declenche qu'UN SEUL tracé a la fin.
-let roT = null, roLastH = -1, roLastW = -1, sizeW = -1;
-function sizeSettledRedraw(wChanged) {
-  if (roT) { clearTimeout(roT); roT = null; }
-  if (wChanged) {
-    if (profilOn) { lastPrMode = null; prDbgSrc = "size"; drawProfil(); }
-    return;
-  }
-  roT = setTimeout(() => {
-    roT = null;
-    if (profilOn) { lastPrMode = null; prDbgSrc = "size"; drawProfil(); }
-  }, 1000);  // v5.16.21 : > TOUS les intervalles de paliers observes
-             // (140, 440 PUIS 640 ms selon le contexte) - le timer est
-             // re-arme par chaque palier : l'animation, quelle que soit
-             // sa vitesse, ne produit qu'UN SEUL tracé a la fin.
+// v5.16.22 : la vraie cause etait l'AMPLITUDE, pas la cadence : les
+// badges successifs montrent des paliers de seulement 4 PX (311->314->
+// 318->322->326->330) - la barre d'URL anime le panneau par micro-pas,
+// et CHAQUE micro-pas (quelle que soit sa cadence, 140/440/640 ms)
+// declenchait un tracé FULL complet. Regle definitive : ne retracer
+// que si la hauteur s'est écartee de >= 20 PX depuis le dernier tracé
+// (seuil sans effet visuel) ; rotation (largeur) reste IMMEDIATE.
+let lastDrawnH = -1, roLastW = -1;
+function sizeSettledRedraw(h, w) {
+  const wChanged = w !== roLastW;
+  const hDelta = Math.abs(h - lastDrawnH);
+  roLastW = w;
+  if (!profilOn) return;
+  if (wChanged || hDelta >= 20) {
+    lastPrMode = null; prDbgSrc = "size"; drawProfil();   // lastDrawnH mis a jour par drawProfil
+  }   // sinon : micro-palier d'animation (<20 px) -> IGNORE
 }
 window.addEventListener("resize", () => {
-  lastPrMode = null;
-  const w = window.innerWidth;
-  sizeSettledRedraw(w !== sizeW);
-  sizeW = w;
+  sizeSettledRedraw(Math.round(document.getElementById("profil").offsetHeight),
+                    window.innerWidth);
 });
 new ResizeObserver(entries => {
   if (!profilOn) return;
   const r = entries[0].contentRect;
-  const h = Math.round(r.height), w = Math.round(r.width);
-  if (h === roLastH && w === roLastW) return;
-  const wChanged = w !== roLastW;
-  roLastH = h; roLastW = w;
-  sizeSettledRedraw(wChanged);
+  sizeSettledRedraw(Math.round(r.height), Math.round(r.width));
 })
   .observe(document.getElementById("profil"));
 
