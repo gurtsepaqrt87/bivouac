@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.17 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.17 = DIAGNOSTIC 2 : le "scintillement lent" (remontee 58m ->
-     3m, hauteur fenetre STABLE) persiste sur certaines photos malgre
-     le debounce. Badge reActive et ENRICHI : chaque trace affiche
-     maintenant H, l'altitude MIN du graphe (em) et le nombre+liste
-     des dates selectionnees - pour distinguer un probleme de
-     GEOMETRIE (H/em stables, dates changeantes = normal) d'un probleme
-     de SELECTION ou de tracés multiples.
+<!-- VERSION v5.16.18 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.18 = FIX scintillement lent CONFIRME par badge v5.16.17 :
+     rafale de FULL [size] avec H decroissant par paliers de ~140 ms -
+     chaque palier SURVIVAIT au debounce 120 ms (v5.16.16) et traçait.
+     Debounce porte a 400 ms : l'animation de barre d'URL (~140 ms par
+     palier) re-arme le timer en continu -> UN SEUL tracé a la fin.
+     Badge diagnostic conserve (a retirer apres validation).
+     v5.16.17 = badge enrichi (em, dates, sources).
      v5.16.16 = debounce unifie resize + ResizeObserver (120 ms).
      v5.16.15 = debounce du ResizeObserver (rafales [obs] identifiées).
      v5.16.14 = version diagnostic (badge orange).
@@ -1341,20 +1341,19 @@ async function toggleAlti() {
   render();
 }
 document.getElementById("hdAlti").onclick = toggleAlti;
-// v5.16.16 : le "scintillement lent" (graph remontant 58m -> 3m apres
-// defilement) venait de l'ecouteur "resize" de la FENETRE, NON debouncé :
-// pendant l'animation de la barre d'URL Android, resize tombe en rafale
-// et chaque evenement declenchait un tracé FULL a une hauteur transi-
-// toire (v5.16.15 n'avait debouncé que le ResizeObserver du panneau).
-// Fix : TOUT redimensionnement (fenetre OU panneau) passe par le meme
-// debouncer 120 ms - un seul tracé, une fois la taille stable.
+// v5.16.18 : le badge v5.16.17 a montre la cause exacte : l'animation
+// de la barre d'URL produit des paliers espaces de ~140 ms - CHACUN
+// survivait au debounce de 120 ms et declenchait son propre tracé FULL
+// (H decroissant 330->311 par paliers). Fix : debounce porte a 400 ms
+// (les paliers ~140 ms le re-arment en continu, l'animation est
+// entierement absorbee) + un seul tracé a la stabilisation.
 let roT = null, roLastH = -1, roLastW = -1;
 function sizeSettledRedraw() {
   if (roT) clearTimeout(roT);
   roT = setTimeout(() => {
     roT = null;
     if (profilOn) { lastPrMode = null; prDbgSrc = "size"; drawProfil(); }
-  }, 120);
+  }, 400);   // > 3x l'intervalle des paliers d'animation (~140 ms)
 }
 window.addEventListener("resize", () => { lastPrMode = null; sizeSettledRedraw(); });
 new ResizeObserver(entries => {
