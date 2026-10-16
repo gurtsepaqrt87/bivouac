@@ -1,12 +1,16 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.27 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.27 = (2F photo+alti) CORRECTION REGRESSION v5.16.26 :
-     sur une image DEJA EN CACHE, "load" se declenche avant
-     l'abonnement (course) -> enablePan jamais appele -> la
-     regle pleine largeur ne s'appliquait pas (paysage letterbox
-     lateral). Filet : si complete au retour de openGal, activer
-     enablePan direct (il retire .tall seul si la photo tient).
+<!-- VERSION v5.16.28 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.28 = (2F photo+alti) TROIS correctifs apres tests terrain :
+     (1) fenetre photo : "40 % du wrap" TROP PETIT -> elle reprend
+     L'ESPACE RESTANT au-dessus de l'alti (geometrie v5.16.24
+     validee), figee en px (anti-retrecissement conserve).
+     (2) photo COURANTE REEVALUEE a l'ouverture/trace de l'alti :
+     enablePan n'etait teste qu'au chargement de la photo, avant
+     que .alti existe -> 1er affichage reste en letterbox.
+     (3) paysage qui tient : PAS de badge "glisser" (enablePan
+     retire .tall seul) ; portrait debordant : badge conserve.
+     v5.16.27 = filet image en cache (course "load") + enablePan idempotent.
      v5.16.26 = (2F alti) toutes les photos PLEINE LARGEUR,
      enablePan gere le debordement vertical (badge "glisser").
      v5.16.25 = fenetre photo epinglee en px (40 %) + poignee ⌄ masquee.
@@ -1148,19 +1152,29 @@ function drawProfil(full) {
     pan.style.height = (wrapEl.classList.contains("showmap")
                         ? Math.round(mwH * 0.35) : mwH) + "px";
   } else if (wrapEl.classList.contains("alti")) {
-    // v5.16.25 : la fenetre PHOTO est egalement EPINGLEE EN PIXELS
-    // (40% du wrap) - meme technique que le panneau alti (v5.16.23) :
-    // les hauteurs % de ce mode etaient les unes apres les autres
-    // contournables ; en px, la fenetre photo ne peut PLUS varier,
-    // quel que soit le type de photo (paysage ou portrait) - fini la
-    // photo recroquevillee avec commentaire remonte et zone noire.
+    // v5.16.25/28 : la fenetre PHOTO est EPINGLEE EN PIXELS - meme
+    // technique que le panneau alti (v5.16.23) : les hauteurs % de
+    // ce mode etaient contournables ; en px, la fenetre photo ne
+    // peut PLUS varier. v5.16.28 : le "40 % du wrap" etait TROP PETIT
+    // (toutes photos ecrasees) -> la fenetre photo reprend L'ESPACE
+    // RESTANT au-dessus de l'alti = exactement la geometrie v5.16.24
+    // validee (photo1), mais figee en px.
+    const altiH = Math.round(mwH * 2 / 3);
     side.style.flex = "none";
-    side.style.height = Math.round(wrapEl.clientHeight * 0.40) + "px";
+    side.style.height = Math.max(120, mwH - altiH) + "px";
+    // v5.16.28 : REEVALUER la photo COURANTE - enablePan n'avait ete
+    // teste qu'au chargement de la photo (avant que .alti existe) :
+    // le premier affichage apres activation de l'alti restait en
+    // letterbox. Ici on retente : pleine largeur si debordement
+    // (badge "glisser"), sinon enablePan retire .tall tout seul
+    // (paysage qui tient = affichage photo1, PAS de badge).
+    const curImg = mediaEl.querySelector("img");
+    if (curImg && curImg.complete && curImg.naturalWidth) enablePan(curImg);
     // v5.16.23 (demande utilisateur) : hauteur du panneau REDUITE
     // D'UN TIERS (2/3 du conteneur, ancree en bas).
     pan.style.flex = "none";
     pan.style.marginTop = "auto";
-    pan.style.height = Math.round(mwH * 2 / 3) + "px";
+    pan.style.height = altiH + "px";
   } else if (wrapEl.classList.contains("p3")) {
     pan.style.flex = ""; pan.style.marginTop = "";
     pan.style.height = Math.round(mwH * 0.40) + "px";   // 3F smartphone
