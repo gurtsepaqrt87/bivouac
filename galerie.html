@@ -1,12 +1,17 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.3 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.3 = FIX troncature 3F apres passage en 1F ALTI (scenario
-     reel : 1F photo -> 1F alti -> 2F -> 3F) : a la fermeture de
-     l'alti, le graphe SVG (tracé en PLEINE HAUTEUR en 1F) est PURGE,
-     ainsi que l'etat puces/poignee - plus jamais de tracé perimé à
-     la réouverture en 3F. Complète le redessin differe + ResizeObserver
-     de la v5.16.2.
+<!-- VERSION v5.16.4 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.4 = 2 FIX DE FOND :
+     (1) CENTRAGE : le pointeur actif est desormais centre dans la
+     zone VISIBLE de la carte (au-dessus du panneau alti) et non dans
+     le conteneur entier - en 3F le panneau recouvrait le bas, le
+     pointeur paraissait decale "comme en 2F" ; s'applique aussi a
+     l'overlay laptop.
+     (2) TRONCATURE ALTI : hauteur du panneau fixee EN PIXELS a chaque
+     ouverture (40% 3F, 35% overlay, 100% 1F) et purge a la fermeture
+     - plus aucune dependance au chemin suivi (1F alti -> 2F -> 3F ne
+     laisse plus de tracé perimé).
+     v5.16.3 = purge du graphe SVG a la fermeture.
      v5.16.2 = redessin differe (rAF + 150 ms) + ResizeObserver panneau.
      v5.16.1 = boutons ⇅/⧉ alti 1F en z-index 1600.
      v5.16 = (1) ouverture smartphone : mode "3 FENETRES" par defaut
@@ -493,8 +498,16 @@ function applySel() {
 
 // ---------- rendu ----------
 function render() {
+  // v5.16.4 : quand le panneau alti RECOUVRE le bas de la carte (3F,
+  // 1F carte+alti, ou overlay laptop), centrer dans la zone VISIBLE
+  // au-dessus du panneau - sinon le pointeur actif est centre dans le
+  // conteneur ENTIER et parait decale vers le bas ("comme en 2F").
+  let profH = 0;
+  if (profilOn && !wrapEl.classList.contains("alti")
+      && !wrapEl.classList.contains("showprofil"))
+    profH = document.getElementById("profil").offsetHeight || 0;
   ox = lon2x(clon, zoom) - mapEl.clientWidth / 2;
-  oy = lat2y(clat, zoom) - mapEl.clientHeight / 2;
+  oy = lat2y(clat, zoom) - (mapEl.clientHeight - profH) / 2;
   world.style.transform = "translate(" + (-ox) + "px," + (-oy) + "px)";
   renderTiles(); renderTraces(); renderMarkers();
 }
@@ -926,15 +939,31 @@ async function toggleProfil() {
 }
 async function openProfil() {
   profilOn = true;
-  document.getElementById("profil").classList.add("on");
+  const pan = document.getElementById("profil");
+  pan.classList.add("on");
   document.getElementById("btProfil").classList.add("on");
-  // v5.15.3 : overlay alti sur la carte en 2F smartphone ("3 fenetres")
-  // -> masquer la photo, barre du haut flottante, alti agrandie a 45%
-  if (MOBILE && !wrapEl.classList.contains("single")
-      && !wrapEl.classList.contains("alti")) {
-    wrapEl.classList.add("p3");
-    barFlash(1500);                  // v5.15.6 : barre flash 1,5 s a l'ouverture
-    centerActive();                  // v5.16 : carte centree sur la photo affichee
+  // v5.16.4 : hauteur du panneau fixee en PIXELS a l'ouverture (35%,
+  // 40% ou 100% du conteneur carte selon la vue) - les hauteurs CSS
+  // en % laissaient des tracés perimés selon le chemin suivi (cas
+  // reel : 1F alti plein ecran -> 2F -> 3F = alti tronquee ; le chemin
+  // par 1F carte n'etait pas affecté). En px + ResizeObserver, le
+  // trace est TOUJOURS coherent avec la hauteur reellement affichee.
+  const mwH = document.getElementById("mapwrap").clientHeight;
+  if (wrapEl.classList.contains("single")) {
+    pan.style.height = (wrapEl.classList.contains("showmap")
+                        ? Math.round(mwH * 0.35) : mwH) + "px";
+  } else if (!wrapEl.classList.contains("alti")) {
+    if (MOBILE) {
+      // overlay alti sur la carte en 2F smartphone ("3 fenetres")
+      wrapEl.classList.add("p3");
+      pan.style.height = Math.round(mwH * 0.40) + "px";
+      barFlash(1500);                // v5.15.6 : barre flash 1,5 s a l'ouverture
+      centerActive();                // v5.16 : carte centree sur la photo affichee
+    } else {
+      pan.style.height = Math.round(mwH * 0.35) + "px";   // laptop : overlay 35%
+    }
+  } else {
+    pan.style.height = "";           // mode 2F photo+alti : CSS flex:1 gouverne
   }
   if (!profilData) {
     try { profilData = await (await fetch(BASE + "/profil.json")).json(); }
@@ -975,6 +1004,7 @@ function closeProfil() {
   const s = document.getElementById("prSvg");
   if (s) s.innerHTML = "";           // jamais de graphe perimé à la réouverture
   pan.classList.remove("chipsbar");
+  pan.style.height = "";            // v5.16.4 : la prochaine ouverture recalcule
   document.getElementById("prChips").classList.remove("show");
   pan.classList.remove("on");
   document.getElementById("btProfil").classList.remove("on");
