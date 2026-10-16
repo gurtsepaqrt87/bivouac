@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.11 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.11 = STABILITE ALTI au defilement (2F photo+alti) : la
-     geometrie du panneau (H/W) est MEMORISEE par mode ; un changement
-     de photo reutilise la geometrie valide au lieu de re-mesurer a
-     chaque trace (le 1er tracé sync mesurait une hauteur en transi-
-     tion -> graphe trop grand affiche un instant (58m coupe) puis
-     corrige (3m) = scintillement). Invalidation au changement de
-     mode, au resize/rotation et a la fermeture du panneau.
+<!-- VERSION v5.16.12 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.12 = FIX scintillement 2F persistant : la cle du cache de
+     geometrie (v5.16.11) etait wrapEl.className ENTIER - or la classe
+     transitoire "baron" (flash de la barre flottante) change a CHAQUE
+     photo -> cache jamais atteint, re-mesure a chaque photo. La cle
+     ne retient desormAIS que les classes de mode (single, showmap,
+     showprofil, alti, p3) + largeur ecran.
+     v5.16.11 = geometrie memorisee par mode (stabilite defilement).
      v5.16.10 = #mapwrap flex-column en .alti (fix mini-alti).
      v5.16.9 = plus aucune hauteur px en 2F alti (flex:1 gouverne).
      v5.16.8 = mesure getBoundingClientRect + borne haute du SVG.
@@ -1104,7 +1104,13 @@ function drawProfil() {
   // (58m en bas), corrige par les traces deferres (3m) -> scintille-
   // ment en 2F photo+alti. Desormais, un changement de photo REUTILISE
   // la hauteur valide du mode courant : un seul affichage, stable.
-  const modeKey = wrapEl.className + (window.innerWidth < 820 ? "|P" : "|L");
+  // v5.16.12 : cle de cache = CLASSES DE MODE SIGNIFICATIVES uniquement
+  // (v5.16.11 utilisait wrapEl.className ENTIER : la classe transitoire
+  // "baron" du flash de barre changeait a CHAQUE photo -> cache jamais
+  // atteint -> re-mesure en pleine transition = scintillement persistant).
+  const modeKey = ["single","showmap","showprofil","alti","p3"]
+    .filter(c => wrapEl.classList.contains(c)).join(",") + "|"
+    + window.innerWidth;
   let H, W;
   if (modeKey === lastPrMode && lastPrH > 0 && lastPrW > 0) {
     H = lastPrH; W = lastPrW;
