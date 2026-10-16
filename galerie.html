@@ -1,14 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.20 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.20 = FIX rafales [size] a vitesse VARIABLE : les badges
-     v5.16.18/19 ont montre des paliers d'animation de barre d'URL a
-     ~140 ms PUIS a ~440 ms - aucun delai fixe ne convient. Regle :
-     largeur changee = rotation -> tracé IMMEDIAT ; seule la hauteur
-     bouge (barre d'URL) -> differe 600 ms RE-ARME par chaque palier,
-     un SEUL tracé a la stabilisation, quelle que soit la vitesse.
-     Complète le bornage a la zone visible de la v5.16.19.
+<!-- VERSION v5.16.21 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.21 = delai hauteur-seule porte a 1000 ms : les intervalles
+     de paliers de la barre d'URL VARIENT avec le contexte (140, 440
+     puis 640 ms d'apres les badges successifs) - chaque delai fixe
+     choisi etait depasse au coup suivant. 1000 ms > tous les
+     intervalles observes ; rotation (largeur) reste IMMEDIATE.
      Badge diagnostic conserve (retrait apres validation).
+     v5.16.20 = rotation immediate / hauteur differee (regle largeur).
      v5.16.19 = tracé de navigation borne a la hauteur VISIBLE.
      v5.16.18 = debounce 400 ms (paliers ~140 ms absorbes).
      v5.16.17 = badge enrichi (em, dates, sources).
@@ -1377,7 +1376,10 @@ function sizeSettledRedraw(wChanged) {
   roT = setTimeout(() => {
     roT = null;
     if (profilOn) { lastPrMode = null; prDbgSrc = "size"; drawProfil(); }
-  }, 600);
+  }, 1000);  // v5.16.21 : > TOUS les intervalles de paliers observes
+             // (140, 440 PUIS 640 ms selon le contexte) - le timer est
+             // re-arme par chaque palier : l'animation, quelle que soit
+             // sa vitesse, ne produit qu'UN SEUL tracé a la fin.
 }
 window.addEventListener("resize", () => {
   lastPrMode = null;
