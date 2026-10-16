@@ -1,13 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.16 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.16 = FIX "scintillement LENT" 2F (graph remontant 58m ->
-     3m apres defilement, hauteur fenetre stable) : l'ecouteur resize
-     de la FENETRE n'etait pas debouncé - pendant l'animation de la
-     barre d'URL, chaque palier declenchait un tracé FULL transitoire
-     (v5.16.15 n'avait debouncé que le ResizeObserver). Desormais
-     fenetre ET panneau partagent le meme debouncer 120 ms : un seul
-     tracé, une fois la taille stable.
+<!-- VERSION v5.16.17 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.17 = DIAGNOSTIC 2 : le "scintillement lent" (remontee 58m ->
+     3m, hauteur fenetre STABLE) persiste sur certaines photos malgre
+     le debounce. Badge reActive et ENRICHI : chaque trace affiche
+     maintenant H, l'altitude MIN du graphe (em) et le nombre+liste
+     des dates selectionnees - pour distinguer un probleme de
+     GEOMETRIE (H/em stables, dates changeantes = normal) d'un probleme
+     de SELECTION ou de tracés multiples.
+     v5.16.16 = debounce unifie resize + ResizeObserver (120 ms).
      v5.16.15 = debounce du ResizeObserver (rafales [obs] identifiées).
      v5.16.14 = version diagnostic (badge orange).
      v5.16.13 = drawProfil(false) : contenu seul au defilement.
@@ -143,10 +144,9 @@
   .prChip{padding:4px 10px;border-radius:14px;background:#1c2230;border:1px solid #45526b;color:#eee;font-size:12px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
   .prChip.on{background:#ff7a00;border-color:#b35300;font-weight:700}
   #prWrap{flex:1;position:relative;margin:0 8px 8px}
-  /* v5.16.14 : badge DIAGNOSTIC - a permis d'identifier le coupable
-     du scintillement (rafales [obs] pendant l'animation de la barre
-     d'URL) ; masque depuis la v5.16.15, retirable a terme */
-  #prDbg{display:none}
+  /* v5.16.17 : badge diagnostic REACTIVE (le scintillement lent
+     restant n'est pas encore identifié : géométrie ou sélection) */
+  #prDbg{position:absolute;right:10px;bottom:4px;z-index:1700;color:#ffb066;font-size:10px;font-family:monospace;pointer-events:none}
   #prSvg{width:100%;height:100%;display:block}
   #bar{position:absolute;top:10px;right:10px;display:flex;gap:8px;z-index:1000}
   #bar button{padding:9px 13px;border-radius:9px;border:1px solid #45526b;background:#1c2230ee;color:#eee;font-size:14px;cursor:pointer;backdrop-filter:blur(4px)}
@@ -348,7 +348,7 @@
       <button id="prHandle" title="Afficher les dates">⌄</button>
       <div id="prChips"></div>
       <div id="prWrap"><svg id="prSvg"></svg></div>
-      <div id="prDbg" style="display:none"></div>
+      <div id="prDbg" title="diagnostic v5.16.17"></div>
     </div>
     <div id="bar">
       <a id="btMap" href="https://umap.openstreetmap.fr/fr/map/cyclo_1463865" target="_blank" title="Ouvrir la carte uMap">🗺 Carte uMap</a>
@@ -944,7 +944,14 @@ let lastPrMode = null, lastPrH = 0, lastPrW = 0;
 // v5.16.14 : DIAGNOSTIC - source du trace en cours + historique
 let prDbgSrc = "?", prDbgLog = "";
 function prDbg(kind) {
-  prDbgLog = kind + " H" + lastPrH + " W" + lastPrW + " [" + prDbgSrc + "] " + Math.round(performance.now()) + " | " + prDbgLog;
+  // v5.16.17 : enrichi - dates selectionnees + altitude min du graphe :
+  // distinguera un probleme de GEOMETRIE (H bouge) d'un probleme de
+  // SELECTION (dates/emin changent) pendant le scintillement lent.
+  const ds = [...prDates].sort().join(";");
+  const em = prMap ? Math.round(prMap.emin) : "-";
+  prDbgLog = kind + " H" + lastPrH + " em" + em + " d" + prDates.size
+           + " [" + prDbgSrc + "] " + Math.round(performance.now())
+           + (ds ? " (" + ds.slice(0, 60) + ")" : "") + " | " + prDbgLog;
   if (prDbgLog.length > 240) prDbgLog = prDbgLog.slice(0, 240);
   const d = document.getElementById("prDbg");
   if (d) d.textContent = prDbgLog;
@@ -1080,15 +1087,14 @@ function drawProfil(full) {
   if (full === false && lastPrH > 0 && lastPrW > 0) {
     const svg = document.getElementById("prSvg");
     const W = lastPrW, H = lastPrH;
-    prDbg("CNT");                          // v5.16.14 diagnostic
     document.querySelectorAll(".prChip").forEach(c =>
       c.classList.toggle("on", prDates.has(c.textContent)));
     svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     svg.innerHTML = ""; prMap = null;
     drawProfilContent(svg, W, H);
+    prDbg("CNT");                          // v5.16.17 : APRES le trace (em reel)
     return;
   }
-  prDbg("FULL");                            // v5.16.14 diagnostic
   document.querySelectorAll(".prChip").forEach(c =>
     c.classList.toggle("on", prDates.has(c.textContent)));
   const pan = document.getElementById("profil");
@@ -1167,6 +1173,7 @@ function drawProfil(full) {
   svg.setAttribute("viewBox", "0 0 " + W + " " + H);
   svg.innerHTML = ""; prMap = null;
   drawProfilContent(svg, W, H);
+  prDbg("FULL");                            // v5.16.17 : APRES le trace (em reel)
 }
 // v5.16.13 : corps de tracé commun (plein et contenu-seul)
 function drawProfilContent(svg, W, H) {
