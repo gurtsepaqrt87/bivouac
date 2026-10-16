@@ -1,12 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.13 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.13 = FIX scintillement 2F DEFINITIF : au changement de
-     photo, drawProfil(false) ne touche AUCUNE geometrie (ni hauteur
-     panneau, ni dimensions SVG) - il redessine uniquement le contenu
-     (courbe, curseur) aux dimensions MEMORISEES du mode. La geometrie
-     n'est recalculee qu'aux vrais changements de contexte (ouverture,
-     mode, resize/rotation, ResizeObserver).
+<!-- VERSION v5.16.14 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.14 = VERSION DIAGNOSTIQUE (temporaire) : le scintillement
+     2F photo+alti resistait aux correctifs v5.16.11-13 - un badge
+     orange (bas-droite de l'alti) trace chaque dessin : type (FULL =
+     recalcul geometrie / CNT = contenu seul), hauteur H memorisee,
+     SOURCE (open, 150ms, rAF, resize, obs=ResizeObserver, nav=change-
+     ment photo, chip=puce) et instant (ms). Reproduire le scintillement
+     et relever le badge identifie le coupable exact.
+     v5.16.13 = drawProfil(false) : contenu seul au defilement.
      v5.16.12 = cle de cache limitee aux classes de mode.
      v5.16.11 = geometrie memorisee par mode (stabilite defilement).
      v5.16.10 = #mapwrap flex-column en .alti (fix mini-alti).
@@ -139,6 +141,9 @@
   .prChip{padding:4px 10px;border-radius:14px;background:#1c2230;border:1px solid #45526b;color:#eee;font-size:12px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
   .prChip.on{background:#ff7a00;border-color:#b35300;font-weight:700}
   #prWrap{flex:1;position:relative;margin:0 8px 8px}
+  /* v5.16.14 : badge DIAGNOSTIC temporaire - identifie quel trace
+     (source) et quelle hauteur (H) produit le scintillement 2F */
+  #prDbg{position:absolute;right:10px;bottom:4px;z-index:1700;color:#ffb066;font-size:10px;font-family:monospace;pointer-events:none}
   #prSvg{width:100%;height:100%;display:block}
   #bar{position:absolute;top:10px;right:10px;display:flex;gap:8px;z-index:1000}
   #bar button{padding:9px 13px;border-radius:9px;border:1px solid #45526b;background:#1c2230ee;color:#eee;font-size:14px;cursor:pointer;backdrop-filter:blur(4px)}
@@ -340,6 +345,7 @@
       <button id="prHandle" title="Afficher les dates">⌄</button>
       <div id="prChips"></div>
       <div id="prWrap"><svg id="prSvg"></svg></div>
+      <div id="prDbg" title="diagnostic v5.16.14"></div>
     </div>
     <div id="bar">
       <a id="btMap" href="https://umap.openstreetmap.fr/fr/map/cyclo_1463865" target="_blank" title="Ouvrir la carte uMap">🗺 Carte uMap</a>
@@ -720,7 +726,7 @@ function openGal(i) {
   // zone admin : pre-remplir le champ commentaire si mode admin
   if (ADM) { document.getElementById("admTxt").value = m.commentaire || ""; }
   // le menu Date suit le media affiche
-  if (profilOn) { syncPrDates(); drawProfil(false);   // v5.16.13 : contenu seul au defilement - geometrie immuable
+  if (profilOn) { prDbgSrc = "nav"; syncPrDates(); drawProfil(false);   // v5.16.13 : contenu seul au defilement - geometrie immuable
                  if (wrapEl.classList.contains("p3")) centerActive(); }
   barFlash();                                    // v5.15.6 : barre flottante
   const dSel = document.getElementById("btDate");
@@ -932,6 +938,14 @@ let profilData = null, profilOn = false, prDates = new Set(), prMap = null;
 // le mode (classes du wrap) ne change pas, les traces suivants
 // reutilisent la meme hauteur/largeur (stabilite au defilement).
 let lastPrMode = null, lastPrH = 0, lastPrW = 0;
+// v5.16.14 : DIAGNOSTIC - source du trace en cours + historique
+let prDbgSrc = "?", prDbgLog = "";
+function prDbg(kind) {
+  prDbgLog = kind + " H" + lastPrH + " W" + lastPrW + " [" + prDbgSrc + "] " + Math.round(performance.now()) + " | " + prDbgLog;
+  if (prDbgLog.length > 240) prDbgLog = prDbgLog.slice(0, 240);
+  const d = document.getElementById("prDbg");
+  if (d) d.textContent = prDbgLog;
+}
 // v5.15.10 : la date alti SUIST la date photo : la selection affichee
 // = dates cochees MANUELLEMENT (puces) U la date de la photo affichee.
 // Changer la date via le menu du haut passiverise l'ancienne date auto
@@ -984,19 +998,19 @@ async function openProfil() {
       const c = document.createElement("span");
       c.className = "prChip"; c.textContent = d;
       c.onclick = () => { prManual.has(d) ? prManual.delete(d) : prManual.add(d);
-                           syncPrDates(); drawProfil(); };
+                           prDbgSrc="chip"; syncPrDates(); drawProfil(); };
       chips.appendChild(c);
     }
   }
-  syncPrDates();                      // v5.15.10 : manuelles + date photo
+  prDbgSrc = "open"; syncPrDates();                      // v5.15.10 : manuelles + date photo
   drawProfil();
   chipsFlash(6000);                    // v5.15.12 : grille dates visible 6 s a l'ouverture
   // v5.16.2 : le layout peut se stabiliser APRES le trace (entree en
   // mode 3F, barre flottante, rotation) -> redessiner une 2e fois une
   // fois les dimensions acquises, sinon le SVG garde la hauteur du
   // premier calcul et le bas du graphe est tronque.
-  setTimeout(() => { if (profilOn) drawProfil(); }, 150);
-  requestAnimationFrame(() => { if (profilOn) drawProfil(); });
+  setTimeout(() => { if (profilOn) { prDbgSrc = "150ms"; drawProfil(); } }, 150);
+  requestAnimationFrame(() => { if (profilOn) { prDbgSrc = "rAF"; drawProfil(); } });
 }
 function closeProfil() {
   profilOn = false;
@@ -1063,6 +1077,7 @@ function drawProfil(full) {
   if (full === false && lastPrH > 0 && lastPrW > 0) {
     const svg = document.getElementById("prSvg");
     const W = lastPrW, H = lastPrH;
+    prDbg("CNT");                          // v5.16.14 diagnostic
     document.querySelectorAll(".prChip").forEach(c =>
       c.classList.toggle("on", prDates.has(c.textContent)));
     svg.setAttribute("viewBox", "0 0 " + W + " " + H);
@@ -1070,6 +1085,7 @@ function drawProfil(full) {
     drawProfilContent(svg, W, H);
     return;
   }
+  prDbg("FULL");                            // v5.16.14 diagnostic
   document.querySelectorAll(".prChip").forEach(c =>
     c.classList.toggle("on", prDates.has(c.textContent)));
   const pan = document.getElementById("profil");
@@ -1316,11 +1332,11 @@ async function toggleAlti() {
 }
 document.getElementById("hdAlti").onclick = toggleAlti;
 window.addEventListener("resize", () => { lastPrMode = null;   // v5.16.11 : rotation/resize -> re-mesurer
-  if (profilOn) drawProfil(); });
+  if (profilOn) { prDbgSrc = "resize"; drawProfil(); } });
 // v5.16.2 : observer AUSSI le panneau alti lui-meme - ses dimensions
 // changent a l'entree/sortie du mode 3F (transition height 35->40%)
 // sans "resize" de la fenetre -> ResizeObserver redessine le graphe.
-new ResizeObserver(() => { if (profilOn) { lastPrMode = null; drawProfil(); } })
+new ResizeObserver(() => { if (profilOn) { lastPrMode = null; prDbgSrc = "obs"; drawProfil(); } })
   .observe(document.getElementById("profil"));
 
 // ---------- glissé sur la photo/video : navigation precedente/suivante ----------
