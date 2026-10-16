@@ -1,13 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.8 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.8 = TRONCATURE ALTI 2F photo+alti (meme famille que 3F) :
-     (1) hauteur panneau mesuree via getBoundingClientRect (force le
-     reflow, contrairement a clientHeight qui rendait une valeur
-     PERIMEE apres le changement de layout 1F -> 2F) ; (2) borne du
-     SVG AUSSI PAR LE HAUT : si le panneau depasse au-dessus du
-     conteneur (hauteur residuelle), le graphe est redimensionne a
-     la zone VISIBLE - plus de bas coupe, quel que soit le chemin.
+<!-- VERSION v5.16.9 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.9 = TRONCATURE ALTI 2F photo+alti (3e tentative, par
+     le LAYOUT) : en mode .alti, plus AUCUNE hauteur px sur le
+     panneau - le CSS flex:1 le contraint a remplir le conteneur
+     (carte masquee). Une hauteur px residuelle heritee du passage
+     en 1F alti (plein ecran) pouvait faire deborder le panneau
+     sous le bord de l'ecran ; en flux flex c'est structurellement
+     impossible, le SVG borne fait le reste.
+     v5.16.8 = mesure getBoundingClientRect + borne haute du SVG.
      v5.16.7 = SVG en pixels explicites, borne par le bas du conteneur.
      v5.16.6 = hauteur panneau recalculee par drawProfil a chaque trace.
      v5.16.5 = CRITIQUE : fix TDZ render()/profilOn (page vide).
@@ -1063,7 +1064,15 @@ function drawProfil() {
     pan.style.height = (wrapEl.classList.contains("showmap")
                         ? Math.round(mwH * 0.35) : mwH) + "px";
   } else if (wrapEl.classList.contains("alti")) {
-    pan.style.height = mwH + "px";       // 2F photo+alti : plein mapwrap
+    // v5.16.9 : en 2F photo+alti, AUCUNE hauteur px - le CSS flex:1
+    // gouverne (carte masquee -> le panneau REMPLIT naturellement le
+    // conteneur, position relative en flux). Toute hauteur px calculee
+    // ici pouvait rester RESIDUELLE apres un passage en 1F alti (plein
+    // ecran) et faire deborder le panneau sous le bord de l'ecran ->
+    // bas du graphe coupe. En flux flex, le panneau est CONTRAINT par
+    // le conteneur : le SVG (deja borne par drawProfil) ne peut plus
+    // sortir de la zone visible.
+    pan.style.height = "";
   } else if (wrapEl.classList.contains("p3")) {
     pan.style.height = Math.round(mwH * 0.40) + "px";   // 3F smartphone
   } else {
