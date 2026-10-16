@@ -1,15 +1,18 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.22 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.22 = FIX PAR SEUIL D'AMPLITUDE (cause racine identifiee :
-     les badges montraient des micro-paliers de 4 PX seulement -
-     311->314->318->322->326->330 - la barre d'URL anime le panneau
-     par micro-pas, chaque micro-pas declenchant un tracé FULL quelle
-     que soit sa cadence, d'ou l'echec des debounces 120/400/600/1000
-     ms). Desormais : ne retracer que si l'ecart de hauteur atteint
-     20 PX depuis le dernier tracé (micro-paliers ignores) ; rotation
-     (largeur) reste IMMEDIATE. Plus AUCUN delai a ajuster.
+<!-- VERSION v5.16.23 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.23 = 2 EVOLUTIONS (2F photo+alti) :
+     (1) DEMANDE UTILISATEUR : hauteur de la fenetre alti REDUITE
+     D'UN TIERS (2/3 du conteneur, ancree en bas) - graphe plus
+     compact, moins sensible aux micro-variations de la barre d'URL.
+     (2) FIX "58m rogne persistant" : le seuil 20 px (v5.16.22)
+     supprimait le scintillement MAIS AUSSI le tracé FINAL quand
+     l'etat stable restait a <20 px du dernier tracé -> affichage
+     bloque en etat tronque. Filet : tracé unique "settle" 800 ms
+     apres le dernier micro-palier - pas de tracé intermediaire
+     visible, etat final toujours correct.
      Badge diagnostic conserve (retrait apres validation).
+     v5.16.22 = seuil 20 px (micro-paliers de 4 px ignores).
      v5.16.21 = delai 1000 ms (insuffisant : cadences variables).
      v5.16.20 = rotation immediate / hauteur differee (regle largeur).
      v5.16.19 = tracé de navigation borne a la hauteur VISIBLE.
@@ -1046,6 +1049,7 @@ function closeProfil() {
   if (s) s.innerHTML = "";           // jamais de graphe perimé à la réouverture
   pan.classList.remove("chipsbar");
   pan.style.height = "";            // v5.16.4 : la prochaine ouverture recalcule
+  pan.style.flex = ""; pan.style.marginTop = "";   // v5.16.23 : retablir le flux
   lastPrMode = null;                // v5.16.11 : re-mesure a la prochaine ouverture
   document.getElementById("prChips").classList.remove("show");
   pan.classList.remove("on");
@@ -1126,21 +1130,23 @@ function drawProfil(full) {
   // 1F alti -> 2F -> 3F laissait une alti tronquee ; les redessins
   // differes rAF/150 ms appliquent la meme logique et auto-corrigent).
   if (wrapEl.classList.contains("single")) {
+    pan.style.flex = ""; pan.style.marginTop = "";   // v5.16.23 : retablir le flux
     pan.style.height = (wrapEl.classList.contains("showmap")
                         ? Math.round(mwH * 0.35) : mwH) + "px";
   } else if (wrapEl.classList.contains("alti")) {
-    // v5.16.9 : en 2F photo+alti, AUCUNE hauteur px - le CSS flex:1
-    // gouverne (carte masquee -> le panneau REMPLIT naturellement le
-    // conteneur, position relative en flux). Toute hauteur px calculee
-    // ici pouvait rester RESIDUELLE apres un passage en 1F alti (plein
-    // ecran) et faire deborder le panneau sous le bord de l'ecran ->
-    // bas du graphe coupe. En flux flex, le panneau est CONTRAINT par
-    // le conteneur : le SVG (deja borne par drawProfil) ne peut plus
-    // sortir de la zone visible.
-    pan.style.height = "";
+    // v5.16.23 (demande utilisateur) : en 2F photo+alti, hauteur du
+    // panneau REDUITE D'UN TIERS (2/3 du conteneur, ancree en bas) -
+    // graphe plus compact = echelle moins sensible aux micro-variations
+    // de hauteur de la barre d'URL. Plus aucun flex:1 : hauteur px fixee
+    // par tracé (comme les autres modes), bord inferieur aligne au bas.
+    pan.style.flex = "none";
+    pan.style.marginTop = "auto";
+    pan.style.height = Math.round(mwH * 2 / 3) + "px";
   } else if (wrapEl.classList.contains("p3")) {
+    pan.style.flex = ""; pan.style.marginTop = "";
     pan.style.height = Math.round(mwH * 0.40) + "px";   // 3F smartphone
   } else {
+    pan.style.flex = ""; pan.style.marginTop = "";
     pan.style.height = Math.round(mwH * 0.35) + "px";   // overlay laptop
   }
   const svg = document.getElementById("prSvg");
@@ -1371,15 +1377,28 @@ document.getElementById("hdAlti").onclick = toggleAlti;
 // declenchait un tracé FULL complet. Regle definitive : ne retracer
 // que si la hauteur s'est écartee de >= 20 PX depuis le dernier tracé
 // (seuil sans effet visuel) ; rotation (largeur) reste IMMEDIATE.
-let lastDrawnH = -1, roLastW = -1;
+let lastDrawnH = -1, roLastW = -1, settleT = null;
 function sizeSettledRedraw(h, w) {
   const wChanged = w !== roLastW;
   const hDelta = Math.abs(h - lastDrawnH);
   roLastW = w;
   if (!profilOn) return;
   if (wChanged || hDelta >= 20) {
+    if (settleT) { clearTimeout(settleT); settleT = null; }
     lastPrMode = null; prDbgSrc = "size"; drawProfil();   // lastDrawnH mis a jour par drawProfil
-  }   // sinon : micro-palier d'animation (<20 px) -> IGNORE
+  } else {
+    // v5.16.23 : le seuil de 20 px supprimait le scintillement MAIS
+    // aussi le tracé FINAL (si l'etat stable est a <20 px du dernier
+    // tracé, il n'etait JAMAIS redessine -> "58m" rogne persistant).
+    // Filet de securite : tracé unique apres 800 ms sans changement
+    // (l'animation, quelle que soit sa cadence, ne le declenche qu'a
+    // sa fin ; aucun tracé intermediaire n'est affiche avant).
+    if (settleT) clearTimeout(settleT);
+    settleT = setTimeout(() => {
+      settleT = null;
+      if (profilOn) { lastPrMode = null; prDbgSrc = "settle"; drawProfil(); }
+    }, 800);
+  }
 }
 window.addEventListener("resize", () => {
   sizeSettledRedraw(Math.round(document.getElementById("profil").offsetHeight),
