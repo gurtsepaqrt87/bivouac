@@ -1,12 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.18 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.18 = FIX scintillement lent CONFIRME par badge v5.16.17 :
-     rafale de FULL [size] avec H decroissant par paliers de ~140 ms -
-     chaque palier SURVIVAIT au debounce 120 ms (v5.16.16) et traçait.
-     Debounce porte a 400 ms : l'animation de barre d'URL (~140 ms par
-     palier) re-arme le timer en continu -> UN SEUL tracé a la fin.
-     Badge diagnostic conserve (a retirer apres validation).
+<!-- VERSION v5.16.19 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.19 = FIX "remontee 58m -> 3m" (badge v5.16.18 : CNT [nav] a
+     H=412 cache alors que la zone visible etait ~312 - barre d'URL
+     revenue) : le SVG debordait du bas visible, le "3m" etait rogne.
+     Le tracé de navigation est desormais BORNE a la hauteur VISIBLE
+     reelle au moment du trace - le graphe reste entier, le tracé
+     [size] deboucne n'ajuste ensuite que la hauteur definitive.
+     Badge diagnostic conserve (retrait apres validation).
+     v5.16.18 = debounce 400 ms (paliers ~140 ms absorbes).
      v5.16.17 = badge enrichi (em, dates, sources).
      v5.16.16 = debounce unifie resize + ResizeObserver (120 ms).
      v5.16.15 = debounce du ResizeObserver (rafales [obs] identifiées).
@@ -1086,9 +1088,18 @@ function drawProfil(full) {
   // recalcul complet (ouverture, changement de mode, resize, rotation).
   if (full === false && lastPrH > 0 && lastPrW > 0) {
     const svg = document.getElementById("prSvg");
-    const W = lastPrW, H = lastPrH;
+    // v5.16.19 : le badge a montre qu'au changement de photo, la hauteur
+    // CACHEE (ex. 414, barre d'URL masquee) peut DEPASSER la zone
+    // reellement visible (ex. 312, barre affichee) : le SVG debordait,
+    // son bas (le "3m") etait rogne -> le "58m" paraissait en bas, puis
+    // le tracé [size] corrigeait = "remontee lente" du graphe.
+    // Fix : borner le tracé de navigation a la hauteur VISIBLE actuelle.
+    const wrapR = document.getElementById("prWrap").getBoundingClientRect();
+    const H = Math.max(60, Math.min(lastPrH, Math.round(wrapR.height)));
+    const W = Math.max(120, Math.min(lastPrW, Math.round(wrapR.width)));
     document.querySelectorAll(".prChip").forEach(c =>
       c.classList.toggle("on", prDates.has(c.textContent)));
+    svg.style.width = W + "px"; svg.style.height = H + "px";
     svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     svg.innerHTML = ""; prMap = null;
     drawProfilContent(svg, W, H);
