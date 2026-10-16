@@ -1,12 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.12 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.12 = FIX scintillement 2F persistant : la cle du cache de
-     geometrie (v5.16.11) etait wrapEl.className ENTIER - or la classe
-     transitoire "baron" (flash de la barre flottante) change a CHAQUE
-     photo -> cache jamais atteint, re-mesure a chaque photo. La cle
-     ne retient desormAIS que les classes de mode (single, showmap,
-     showprofil, alti, p3) + largeur ecran.
+<!-- VERSION v5.16.13 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.13 = FIX scintillement 2F DEFINITIF : au changement de
+     photo, drawProfil(false) ne touche AUCUNE geometrie (ni hauteur
+     panneau, ni dimensions SVG) - il redessine uniquement le contenu
+     (courbe, curseur) aux dimensions MEMORISEES du mode. La geometrie
+     n'est recalculee qu'aux vrais changements de contexte (ouverture,
+     mode, resize/rotation, ResizeObserver).
+     v5.16.12 = cle de cache limitee aux classes de mode.
      v5.16.11 = geometrie memorisee par mode (stabilite defilement).
      v5.16.10 = #mapwrap flex-column en .alti (fix mini-alti).
      v5.16.9 = plus aucune hauteur px en 2F alti (flex:1 gouverne).
@@ -719,8 +720,8 @@ function openGal(i) {
   // zone admin : pre-remplir le champ commentaire si mode admin
   if (ADM) { document.getElementById("admTxt").value = m.commentaire || ""; }
   // le menu Date suit le media affiche
-  if (profilOn) { syncPrDates(); drawProfil();
-                 if (wrapEl.classList.contains("p3")) centerActive(); } // v5.16 : recentrage en 3F
+  if (profilOn) { syncPrDates(); drawProfil(false);   // v5.16.13 : contenu seul au defilement - geometrie immuable
+                 if (wrapEl.classList.contains("p3")) centerActive(); }
   barFlash();                                    // v5.15.6 : barre flottante
   const dSel = document.getElementById("btDate");
   if (dSel.value !== m.date) dSel.value = m.date;
@@ -1053,7 +1054,22 @@ function prColor(date) {
   const m = media.find(x => x.date === date && x.color);
   return m ? m.color : "#1f77e5";
 }
-function drawProfil() {
+function drawProfil(full) {
+  // v5.16.13 : drawProfil(false) = REDRAW CONTENU SEUL - aucune
+  // mesure, aucun style de hauteur : le SVG garde EXACTEMENT ses
+  // dimensions (cache). Utilise au changement de photo : geometrie
+  // totalement immuable -> scintillement impossible. full (defaut) :
+  // recalcul complet (ouverture, changement de mode, resize, rotation).
+  if (full === false && lastPrH > 0 && lastPrW > 0) {
+    const svg = document.getElementById("prSvg");
+    const W = lastPrW, H = lastPrH;
+    document.querySelectorAll(".prChip").forEach(c =>
+      c.classList.toggle("on", prDates.has(c.textContent)));
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.innerHTML = ""; prMap = null;
+    drawProfilContent(svg, W, H);
+    return;
+  }
   document.querySelectorAll(".prChip").forEach(c =>
     c.classList.toggle("on", prDates.has(c.textContent)));
   const pan = document.getElementById("profil");
@@ -1131,6 +1147,10 @@ function drawProfil() {
   svg.style.width = W + "px"; svg.style.height = H + "px";
   svg.setAttribute("viewBox", "0 0 " + W + " " + H);
   svg.innerHTML = ""; prMap = null;
+  drawProfilContent(svg, W, H);
+}
+// v5.16.13 : corps de tracé commun (plein et contenu-seul)
+function drawProfilContent(svg, W, H) {
   if (!profilData || !prDates.size) return;
   // v5.14.1 : journees mises BOUT A BOUT sur un axe virtuel -> les
   // nuits ne creent plus d'espaces vides ; chaque journee occupe une
