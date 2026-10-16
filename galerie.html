@@ -1,13 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.9 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.9 = TRONCATURE ALTI 2F photo+alti (3e tentative, par
-     le LAYOUT) : en mode .alti, plus AUCUNE hauteur px sur le
-     panneau - le CSS flex:1 le contraint a remplir le conteneur
-     (carte masquee). Une hauteur px residuelle heritee du passage
-     en 1F alti (plein ecran) pouvait faire deborder le panneau
-     sous le bord de l'ecran ; en flux flex c'est structurellement
-     impossible, le SVG borne fait le reste.
+<!-- VERSION v5.16.10 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.10 = FIX mini-alti 2F photo+alti (regression v5.16.9) :
+     sans hauteur px, le panneau dependait de flex:1... INERTE car
+     #mapwrap n'etait pas un contexte flex (display bloc) -> alti
+     reduite a son contenu en haut, reste de fenetre noir. Desormais
+     #mapwrap devient flex-column en mode .alti : le panneau flex:1
+     REMPLIT reellement le conteneur - plein bas d'ecran, sans tron-
+     cature, quel que soit le chemin suivi.
+     v5.16.9 = plus aucune hauteur px en 2F alti (flex:1 gouverne).
      v5.16.8 = mesure getBoundingClientRect + borne haute du SVG.
      v5.16.7 = SVG en pixels explicites, borne par le bas du conteneur.
      v5.16.6 = hauteur panneau recalculee par drawProfil a chaque trace.
@@ -198,6 +199,7 @@
      a pleine hauteur du bas de panneau) -> combo photo + altimetrie */
   #wrap.alti #map{display:none}
   #wrap.alti #zoom,#wrap.alti #bar,#wrap.alti #btLayoutM{display:none}
+  #wrap.alti #mapwrap{display:flex;flex-direction:column}   /* v5.16.10 : contexte flex - sans lui, flex:1 du panneau etait INERTE (parent en bloc) et height:auto le reduisait a la hauteur de son contenu (mini-alti en haut, reste noir) */
   #wrap.alti #profil{display:flex;position:relative;height:auto;flex:1;border-top:none}
   /* v5.16.6 : la hauteur REELLE du panneau alti est fixee en px par
      drawProfil a chaque trace ; height:auto ci-dessus n'est qu'un
