@@ -1,16 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.30 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.30 = (2F photo+alti) GEOMETRIE DETERMINISTE : la hauteur
-     mesurant mapwrap DEPENDAIT du layout du moment (micro-paliers
-     barre d'URL, flex-shrink photo) - d'ou l'ecart apparent entre
-     versions (v5.16.24 = accident de timing, alti courte ; v5.16.25+
-     = alti gonflee 40% ecran, photo ecrasee, bande noire). Desormais
-     on mesure le WRAP (stable) et on REPARTIT : alti = 40% ecran
-     (hauteur v5.16.24 validee), photo = TOUT LE RESTE (recupere
-     la bande noire). Conserves : pleine largeur + badge "glisser"
-     (enablePan, reevalue a chaque trace), poignee ⌄ masquee.
-     v5.16.29 = revert epinglage (ABANDONNE - mesure mapwrap source de drift).
+<!-- VERSION v5.16.31 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.31 = (2F photo+alti) PHOTO PAYSAGE A 100 % : a 40 %,
+     l'alti laissait le paysage TRES LEGEREMENT TRONQUE (ratio 4:3).
+     On calcule la hauteur EXACTE qu'exige la photo courante pleine
+     largeur (barre + commentaire deduits) et on la PREND SUR
+     L'ALTI (plancher 22 % ecran) : paysage entier, sans badge ;
+     portrait : badge "glisser" conserve. Le reste est inchange
+     (geometrie deterministe v5.16.30, poignee ⌄ masquee).
+     v5.16.30 = geometrie deterministe (alti 40 % ecran, photo = reste).
      v5.16.28 = espace restant (ABANDONNE - fenetre = 1/3 mwH).
      v5.16.27 = filet image en cache + enablePan idempotent.
      v5.16.26 = toutes les photos PLEINE LARGEUR (badge "glisser").
@@ -1153,30 +1151,46 @@ function drawProfil(full) {
     pan.style.height = (wrapEl.classList.contains("showmap")
                         ? Math.round(mwH * 0.35) : mwH) + "px";
   } else if (wrapEl.classList.contains("alti")) {
-    // v5.16.30 : GEOMETRIE DETERMINISTE, plus AUCUNE mesure de
-    // mapwrap (mwH) ici : en colonne portrait, la hauteur de
-    // mapwrap DEPEND du layout du moment (micro-paliers barre
-    // d'URL, flex-shrink de la photo) - selon l'instant du trace,
-    // mwH etait trop petit (v5.16.24 : alti courte, photo grande -
-    // un accident de timing) ou plein (v5.16.25+ : alti 40% ecran
-    // gonflee, photo ecrasee, bande noire). On mesure le WRAP
-    // (stable) et on REPARTIT explicitement :
-    //   alti  = 40 % de l'ecran (hauteur v5.16.24 validee),
-    //   photo = TOUT LE RESTE (elle recupere l'ancienne bande
-    //           noire : plus jamais de zone inutilisee).
+    // v5.16.30 : GEOMETRIE DETERMINISTE - on mesure le WRAP (stable)
+    // et on REPARTIT explicitement, jamais mapwrap (mwH depend du
+    // layout du moment : micro-paliers barre d'URL, flex-shrink).
+    // v5.16.31 (demande utilisateur) : le paysage restait TRES
+    // LEGEREMENT TRONQUE (ratio 4:3 plus haut que 16:9) -> on
+    // calcule la hauteur EXACTE qu'exige la photo COURANTE pleine
+    // largeur (barre + commentaire deduits) et on la PREND SUR
+    // L'ALTI, jusqu'a un plancher de lisibilite (22 % ecran).
+    //   alti  = 40 % ecran, reduite au besoin -> photo 100 %,
+    //   photo = TOUT LE RESTE (elle recupere l'ancienne bande noire).
     const wrapH = wrapEl.clientHeight;
     const splitH = 10;                       // #split en .alti portrait
-    const altiH = Math.round(wrapH * 0.40);
+    let altiH = Math.round(wrapH * 0.40);
+    const floorAlti = Math.max(140, Math.round(wrapH * 0.22));
     side.style.flex = "none";
-    side.style.height = Math.max(120, wrapH - splitH - altiH) + "px";
-    // v5.16.28/29 : REEVALUER la photo COURANTE a chaque trace -
-    // enablePan n'etait teste qu'au chargement de la photo, avant
-    // que .alti existe : le 1er affichage apres activation de
-    // l'alti restait en letterbox. Retente ici : pleine largeur si
-    // debordement (badge "glisser"), sinon enablePan retire .tall
-    // tout seul (paysage qui tient = affichage photo1, PAS de badge).
+    side.style.height = (wrapH - splitH - altiH) + "px";
+    const shEl = document.querySelector("#side .sh");
+    const capEl = document.getElementById("cap");
+    const sideW = Math.round(side.getBoundingClientRect().width);
+    const shH = Math.round(shEl.getBoundingClientRect().height);
+    const capH = Math.round(capEl.getBoundingClientRect().height);
     const curImg = mediaEl.querySelector("img");
-    if (curImg && curImg.complete && curImg.naturalWidth) enablePan(curImg);
+    if (curImg && curImg.complete && curImg.naturalWidth) {
+      // hauteur qu'exige CETTE photo a PLEINE LARGEUR
+      const need = Math.ceil(curImg.naturalHeight
+                             / curImg.naturalWidth * sideW);
+      const avail = wrapH - splitH - altiH - shH - capH;
+      if (need > avail && altiH > floorAlti) {
+        const give = Math.min(altiH - floorAlti, need - avail);
+        altiH -= give;
+        side.style.height = (wrapH - splitH - altiH) + "px";
+      }
+      // v5.16.28+ : REEVALUER la photo COURANTE a chaque trace -
+      // enablePan n'etait teste qu'au chargement de la photo, avant
+      // que .alti existe. Retente APRES fixation des hauteurs :
+      // pleine largeur si debordement (badge "glisser"), sinon
+      // enablePan retire .tall tout seul (paysage qui tient =
+      // affichage photo1 a 100 %, PAS de badge, PAS de troncature).
+      enablePan(curImg);
+    }
     // v5.16.23 (demande utilisateur) : panneau ANCRE EN BAS.
     pan.style.flex = "none";
     pan.style.marginTop = "auto";
