@@ -1,14 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.25 : chercher "v5.16" (Ctrl+U, Ctrl+F).
-     v5.16.25 = (2F photo+alti UNIQUEMENT) :
-     (1) fenetre PHOTO EPINGLEE EN PIXELS (40 % du wrap) dans le
-     trace complet - sa hauteur ne varie plus, quelle que soit la
-     photo (paysage OU portrait) ; les hauteurs % etaient
-     contournables par le mode .tall des portraits.
-     (2) poignee orange ⌄ MASQUEE (display:none) : la barre du
-     haut est FIXE dans ce mode, elle reaparaissait ~1 s apres
-     chaque photo (flash "baron" qui expire).
+<!-- VERSION v5.16.26 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.26 = (2F photo+alti UNIQUEMENT) CORRECTION REGRESSION
+     v5.16.25 : la fenetre photo epinglee en px (40 %) rendait la
+     boite media trop basse pour un paysage -> max-height reduisait
+     sa LARGEUR (letterbox lateral, barres noires laterales).
+     Fix : en .alti, TOUTES les photos (paysage OU portrait) sont
+     rendues PLEINE LARGEUR ; enablePan gere le debordement vertical
+     (badge "glisser") et retire .tall seul si la photo tient.
+     v5.16.25 = fenetre photo epinglee en px (40 %) + poignee ⌄ masquee.
      v5.16.24 = barre du haut fixe en 2F alti + retrait traceur.
      v5.16.23 = alti reduite d'un tiers + tracé final garanti.
      Synthese serie : alti 2F = 2/3 ancree en bas, seuil 20 px +
@@ -732,7 +732,16 @@ function openGal(i) {
     el = document.createElement("img");
     el.src = m.url; el.alt = "";
     // v5.13 : portrait -> defilement vertical dans le cadre fixe
-    el.addEventListener("load", () => { if (el.naturalHeight > el.naturalWidth) enablePan(el); });
+    // v5.16.26 : en 2F photo+alti, TOUTES les photos sont PLEINE
+    // LARGEUR (paysage compris) - la fenetre photo EPINGLEE en px
+    // (v5.16.25) avait rendu la boite media trop basse pour un
+    // paysage : max-height reduisait la largeur (letterbox lateral).
+    // enablePan retire .tall tout seul si la photo tient entier et
+    // affiche sinon le badge "glisser" (parties tronquees).
+    el.addEventListener("load", () => {
+      if (el.naturalHeight > el.naturalWidth
+          || wrapEl.classList.contains("alti")) enablePan(el);
+    });
     fitSideToMedia(el, false);
   }
   mediaEl.appendChild(el);
