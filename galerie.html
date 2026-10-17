@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.17.0 : chercher "v5.17" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.17.1 : chercher "v5.17" (Ctrl+U, Ctrl+F).
+     v5.17.1 = BADGE KM du jour : a droite du selecteur de date, la
+     distance de la journee active. Source : profil.json "km" (calcule
+     par build_daily v5.2.27 sur les points NON decimes - garmin 1/s
+     = precision maximale) ; secours : trace.geojson (datee) ; journee
+     live non publiee : distance de live_trace (gpslogger, evolue en
+     direct au fil du poll 30 s). profil.json est charge au boot
+     (independamment du panneau alti).
      v5.17.0 = POSITIONNEMENT LIVE : pendant la journee, live.py
      (Telephone, toutes les 2 min) pousse live.json + live_trace.geojson
      depuis l'enregistrement gpslogger (1 pt/min). La galerie POLL le
@@ -177,6 +184,9 @@
   #profil.on{display:flex}
   #prChips{display:flex;gap:6px;overflow-x:auto;padding:6px 8px;flex:0 0 auto;scrollbar-width:thin}
   .prChip{padding:4px 10px;border-radius:14px;background:#1c2230;border:1px solid #45526b;color:#eee;font-size:12px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
+  /* v5.17.1 : badge km de la journee active (droite du selecteur de date) */
+  #kmDay{padding:4px 10px;border-radius:14px;background:#1c2230;border:1px solid #45526b;color:#ffd60a;font-size:12px;font-weight:700;white-space:nowrap;flex:0 0 auto}
+  #kmDay:empty{display:none}
   .prChip.on{background:#ff7a00;border-color:#b35300;font-weight:700}
   #prWrap{flex:1;position:relative;margin:0 8px 8px}
   #prSvg{width:100%;height:100%;display:block}
@@ -363,6 +373,7 @@
     <div class="sh">
       <button class="nav" id="prev" title="Précédent (←)">‹</button>
       <div class="selwrap"><span class="selbox"><select class="nav" id="btDate" title="Journée affichée"></select><span class="selArrow">▾</span></span></div>
+      <span id="kmDay" title="Distance parcourue ce jour"></span>
       <button class="nav" id="hdFlip" title="Voir la carte">🗺</button>
       <button class="nav" id="hdAlti" title="Voir l'altimétrie">⛰</button>
       <button class="nav" id="hdLayout" title="Affichage 2 fenêtres">⧉</button>
@@ -419,6 +430,8 @@ let ox = 0, oy = 0;
 let media = [], marks = [], traces = [];
 // v5.17 : live (position gpslogger du jour, poussee par live.py)
 let live = null, liveTrace = [], liveEl = null;
+// v5.17.1 : km par journee (profil.json "km", charge au boot)
+let kmData = null;
 let sel = -1, userResized = false;   // userResized : l'utilisateur a glisse la poignee -> plus d'ajustement auto
 const ZMIN = 3, ZMAX = 16;   // v5.16 : ZMAX 18->16, butee anti "page
                              // bleue" (au-dela de 16, tuiles vides/ocean)
@@ -521,6 +534,41 @@ function renderTraces() {
   world.appendChild(svg);
 }
 
+// ---------- v5.17.1 : badge km de la journee active ----------
+function havKm(coords) {
+  let d = 0;
+  for (let i = 1; i < coords.length; i++) {
+    const dlat = (coords[i][1] - coords[i - 1][1]) * 0.0174533;
+    const dlon = (coords[i][0] - coords[i - 1][0]) * 0.0174533;
+    const mlat = (coords[i][1] + coords[i - 1][1]) / 2 * 0.0174533;
+    d += 6371 * Math.sqrt(dlat * dlat + Math.pow(dlon * Math.cos(mlat), 2));
+  }
+  return d;
+}
+function updateKmDay() {
+  const el = document.getElementById("kmDay");
+  if (!el) return;
+  const d = media[sel] ? media[sel].date : null;
+  if (!d) { el.textContent = ""; return; }
+  // 1) profil.json "km" (points NON decimes - garmin 1/s : precis)
+  let km = (kmData && kmData[d] != null) ? kmData[d] : null;
+  // 2) secours : trace.geojson datee (points decimes - anciens profil)
+  if (km == null) {
+    let t = 0;
+    for (const f of traces)
+      if ((f.properties || {}).date === d) t += havKm(f.geometry.coordinates || []);
+    if (t > 0) km = t;
+  }
+  // 3) journee live pas encore publiee : distance de la trace live
+  if (km == null && live && live.date === d && liveTrace.length) {
+    let t = 0;
+    for (const f of liveTrace) t += havKm(f.geometry.coordinates || []);
+    km = t;
+  }
+  el.textContent = km == null ? "" :
+    String(km < 10 ? km.toFixed(1) : Math.round(km)).replace(".", ",") + " km";
+}
+
 // ---------- v5.17 : positionnement LIVE ----------
 function liveValid() {
   // affiche seulement si : donnee du JOUR, signal de moins de 30 min
@@ -606,7 +654,7 @@ function render() {
   ox = lon2x(clon, zoom) - mapEl.clientWidth / 2;
   oy = lat2y(clat, zoom) - (mapEl.clientHeight - profH) / 2;
   world.style.transform = "translate(" + (-ox) + "px," + (-oy) + "px)";
-  renderTiles(); renderTraces(); renderMarkers(); renderLive();
+  renderTiles(); renderTraces(); renderMarkers(); renderLive(); updateKmDay();
   // v5.17 : trace LIVE du jour en pointilles gris, SOUS les cumuls
   if (liveValid() && liveTrace.length) {
     const sg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1607,6 +1655,11 @@ async function load() {
     media.sort((a, b) => (a.date + "|" + a.name).localeCompare(b.date + "|" + b.name));
     media.forEach((m, i) => m.i = i);
     try { traces = (await fetchJ("trace.geojson")).features || []; } catch (e) { traces = []; }
+    // v5.17.1 : profil.json au BOOT pour le badge km (variable kmData
+    // dediee : le panneau alti garde son chargement differe profilData
+    // et la construction de ses puces de dates).
+    try { kmData = (await (await fetch(BASE + "/profil.json?v=" + Date.now())).json()).km || null; }
+    catch (e) { kmData = null; }
     if (media.length) {
       let n = 90, s = -90, w = 180, e = -180;
       for (const m of media) { n = Math.max(n, m.lat); s = Math.min(s, m.lat); w = Math.min(w, m.lon); e = Math.max(e, m.lon); }
