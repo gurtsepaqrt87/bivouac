@@ -1,6 +1,19 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.17.1 : chercher "v5.17" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.19.0 : chercher "v5.19" (Ctrl+U, Ctrl+F).
+     v5.19.0 = BOUTON RELIEF 3D (🏔, pile zoom, a cote de 🛰) : fond
+     OpenTopoMap (ombrage du terrain, courbes de niveau, altitudes).
+     Le mode de fond passe d un booleen satellite a 3 etats plan/sat/
+     topo ; un seul actif a la fois, re-tap = retour au plan.
+     v5.18.1 = marqueurs REDUITS sur smartphone en 2F et 1F
+     (echelle .75 ; selectionne 1.25 ; le 3F garde ses tailles
+     .67/1.1 plus specifiques).
+     v5.18.0 = LIENS AMIS TEMPORAIRES : bloc AMIS (code par ami ->
+     date d'expiration) juste apres BASE/REPO. Sert au déploiement
+     VITRINE (MOP partie 7) : lien ami = .../?ami=<code> ; expire
+     -> page remplacee par "lien expire" ; sans code -> accès normal
+     (le dépôt données ne bloque jamais). Revocation avant terme =
+     retirer la ligne + push.
      v5.17.1 = BADGE KM du jour : a droite du selecteur de date, la
      distance de la journee active. Source : profil.json "km" (calcule
      par build_daily v5.2.27 sur les points NON decimes - garmin 1/s
@@ -279,7 +292,7 @@
        puces tronquaient le bas du graphe. La puce par defaut reste la
        date du media affiche ; les autres dates restent accessibles via
        les vues alti pleine hauteur (2F .alti ou 1F plein ecran). */
-    #zoom #btProfil,#zoom #btSat{width:40px;height:40px;font-size:19px}
+    #zoom #btProfil,#zoom #btSat,#zoom #btTopo{width:40px;height:40px;font-size:19px}
     #wrap:not(.alti):not(.showprofil) #profil.on #prChips{padding-top:6px}
     /* v5.15.3 : cas "3 fenetres" (2F photo+carte + ⛰ overlay) : photo
        masquee, barre du haut FLOTTANTE translucide par-dessus la carte,
@@ -322,9 +335,17 @@
     #prClose{display:none}
     #wrap.p3 #prClose{display:flex;position:absolute;top:6px;right:8px;z-index:1600;width:36px;height:36px;border-radius:10px;border:2px solid #b35300;background:#ff7a00;color:#fff;font-size:17px;font-weight:700;align-items:center;justify-content:center;cursor:pointer}
     #wrap.p3 #profil{height:40%}
-    /* v5.16 : en mode "3 fenetres" uniquement, marqueurs REDUITS d'1/3
-       (moins intrusifs ; le marqueur selectionne reste agrandi mais
-       reste plus petit qu'en 2F). Le 2F photo+carte est INCHANGE. */
+    /* v5.18.1 : marqueurs REDUITS sur smartphone en 2F et 1F (pin 22px
+       -> ~16px visuel) : plus discrets sur petit ecran, la carte
+       reste lisible quand les photos sont proches. Le marqueur
+       SELECTIONNE reste agrandi mais reste < au desktop. Le mode
+       3F garde ses tailles dediees ci-dessous (.67 / 1.1, plus
+       specifiques : elles gagnent). */
+    .mk .icon{transform:scale(.75)}
+    .mk.sel .icon{transform:scale(1.25)}
+    /* v5.16 : en mode "3 fenetres" uniquement, marqueurs encore plus
+       reduits (la carte y est la plus petite des vues). Ces regles
+       plus specifiques gagnent sur celles du 2F/1F ci-dessus. */
     #wrap.p3 .mk .icon{transform:scale(.67)}
     #wrap.p3 .mk.sel .icon{transform:scale(1.1)}
     /* styles communs des poignees ⌄ (barre du haut, puces alti) */
@@ -394,7 +415,7 @@
     <div id="map"><div id="world"></div></div>
     <button id="btFlip" title="Revenir à la photo">⇅</button>
     <button id="btLayoutM" title="Affichage 2 fenêtres">⧉</button>
-    <div id="zoom"><button id="zin" title="Zoom +">+</button><button id="zout" title="Zoom −">−</button><button id="btProfil" title="Profil altimétrique">⛰</button><button id="btSat" title="Vue satellite (Esri)">🛰</button></div>
+    <div id="zoom"><button id="zin" title="Zoom +">+</button><button id="zout" title="Zoom −">−</button><button id="btProfil" title="Profil altimétrique">⛰</button><button id="btSat" title="Vue satellite (Esri)">🛰</button><button id="btTopo" title="Vue relief 3D (OpenTopoMap)">🏔</button></div>
     <div id="profil">
       <button id="prClose" title="Fermer l'altimétrie">✕</button>
       <button id="prHandle" title="Afficher les dates">⌄</button>
@@ -415,6 +436,29 @@ const BASE = "https://gurtsepaqrt87.github.io/gkr63x-g84zwo";
 // NB : non deduisible de BASE (sur user.github.io/projet, l'user est
 // dans le sous-domaine, pas dans le chemin) - d'ou cette constante.
 const REPO = "gurtsepaqrt87/gkr63x-g84zwo";
+// --- v5.18 : liens amis temporaires (déploiement VITRINE) ---
+// Un code par ami + date d'expiration ISO. Le lien ami :
+//   https://<user>.github.io/<vitrine>/?ami=<code>
+// - code absent ou inconnu -> accès NORMAL (lien famille permanent ;
+//   aussi le cas du dépôt données, qui ne doit RIEN bloquer).
+// - code valide -> accès jusqu'à sa date (23:59:59).
+// - code expiré -> la page est remplacee par "lien expire".
+// Revoquer avant terme : retirer la ligne + push vitrine (~1 min).
+// NB honnete : la table est lisible dans le source ; la protection
+// REELLE reste la rotation du dépôt données (MOP partie 7 §4).
+const AMIS = {
+  // "exemple": "2026-12-31",   // <- 1 ligne par ami, code arbitraire
+};
+if (location.search.includes("ami=")) {
+  const q = new URLSearchParams(location.search).get("ami");
+  const exp = q && AMIS[q];
+  if (exp && new Date() > new Date(exp + "T23:59:59")) {
+    document.body.innerHTML =
+      "<p style='padding:40px;font-size:20px;font-family:sans-serif'>" +
+      "Lien expiré — demandez un lien à jour à Alain.</p>";
+    throw new Error("expired");
+  }
+}
 
 const mapEl = document.getElementById("map");
 const world = document.getElementById("world");
@@ -471,10 +515,14 @@ function py2lat(py) {
 
 // ---------- tuiles ----------
 const tiles = new Map();
-let sat = false;   // v5.16 : vue satellite (tuiles Esri World Imagery)
-function setSat(v) {
-  sat = v;
-  document.getElementById("btSat").classList.toggle("on", sat);
+// v5.19 : mode de fond de carte - "plan" (OSM), "sat" (Esri) ou
+// "topo" (OpenTopoMap : ombrage du terrain, courbes de niveau,
+// altitudes - la vue "relief 3D"). Un seul mode actif a la fois.
+let vue = "plan";
+function setVue(v) {
+  vue = v;
+  document.getElementById("btSat").classList.toggle("on", vue === "sat");
+  document.getElementById("btTopo").classList.toggle("on", vue === "topo");
   tiles.forEach(img => img.remove());   // vider le cache : autres tuiles
   tiles.clear();
   render();
@@ -491,12 +539,16 @@ function renderTiles() {
     if (tiles.has(key)) continue;
     const img = document.createElement("img");
     img.className = "tile";
-    // v5.16 : OSM (plan) ou Esri World Imagery (satellite) - Esri :
-    // /tile/{z}/{y}/{x} (y AVANT x, contrairement a OSM)
-    if (sat) {
+    // v5.16/v5.19 : plan OSM, satellite Esri ou relief OpenTopoMap.
+    // Esri : /tile/{z}/{y}/{x} (y AVANT x, contrairement a OSM).
+    // OpenTopoMap : meme ordre z/x/y qu'OSM (tuiles plus lourdes,
+    // zoom max 17 - charge un peu plus lentement que le plan).
+    if (vue === "sat") {
       const p = key.split("/");
       img.src = "https://server.arcgisonline.com/ArcGIS/rest/services/"
               + "World_Imagery/MapServer/tile/" + p[0] + "/" + p[2] + "/" + p[1];
+    } else if (vue === "topo") {
+      img.src = "https://tile.opentopomap.org/" + key + ".png";
     } else {
       img.src = "https://tile.openstreetmap.org/" + key + ".png";
     }
@@ -1503,7 +1555,8 @@ document.getElementById("prSvg").addEventListener("click", e => {
   if (best >= 0 && bd < 90 * 60 * 1000) openGal(best);   // sinon : clic trop loin de toute photo
 });
 document.getElementById("btProfil").onclick = toggleProfil;
-document.getElementById("btSat").onclick = () => setSat(!sat);   // v5.16
+document.getElementById("btSat").onclick = () => setVue(vue === "sat" ? "plan" : "sat");   // v5.19
+document.getElementById("btTopo").onclick = () => setVue(vue === "topo" ? "plan" : "topo");   // v5.19 : relief 3D
 // v5.15 : bouton ⛰ de l'ENTETE (mobile) - deux comportements :
 //  - 1 fenetre : alti PLEIN ECRAN (classe .showprofil), retour photo
 //    par le bouton flottant ⇅ (btFlip)
