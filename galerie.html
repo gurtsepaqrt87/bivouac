@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.16.31 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.16.32 : chercher "v5.16" (Ctrl+U, Ctrl+F).
+     v5.16.32 = ALTIMETRIE VIDE / jour absent : profil.json etait
+     charge SANS cache-busting (contrairement a photos.csv?v=...) -
+     le navigateur servait un profil PERIME depuis le cache HTTP :
+     le jour courant manquait dans la liste des dates et le graphe
+     restait vide (l'alti auto-selectionne la journee de la photo
+     affichee). Meme correctif : ?v=Date.now().
      v5.16.31 = (2F photo+alti) PHOTO PAYSAGE A 100 % : a 40 %,
      l'alti laissait le paysage TRES LEGEREMENT TRONQUE (ratio 4:3).
      On calcule la hauteur EXACTE qu'exige la photo courante pleine
@@ -1027,7 +1033,7 @@ async function openProfil() {
     // laptop : overlay simple, aucune classe supplementaire
   }
   if (!profilData) {
-    try { profilData = await (await fetch(BASE + "/profil.json")).json(); }
+    try { profilData = await (await fetch(BASE + "/profil.json?v=" + Date.now())).json(); }
     catch (e) { profilData = { dates: {} }; }
     const chips = document.getElementById("prChips");
     chips.innerHTML = "";
