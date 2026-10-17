@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.19.2 : chercher "v5.19" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.19.3 : chercher "v5.19" (Ctrl+U, Ctrl+F).
+     v5.19.3 = badge km du jour AGRANDI sur laptop/desktop
+     (17px + padding renforce ; mobile reste a 12px).
      v5.19.2 = en 3F smartphone, pile de gauche REDUITE (32px :
      ⛰ 🛰 🏔 moins envahissants sur la petite carte) + menu des
      fonds rapproche et compact.
@@ -212,6 +214,9 @@
   /* v5.17.1 : badge km de la journee active (droite du selecteur de date) */
   #kmDay{padding:4px 10px;border-radius:14px;background:#1c2230;border:1px solid #45526b;color:#ffd60a;font-size:12px;font-weight:700;white-space:nowrap;flex:0 0 auto}
   #kmDay:empty{display:none}
+  /* v5.19.3 : badge km AGRANDI sur laptop/desktop (17px = taille
+     des boutons de la barre du haut + 2px) ; mobile garde 12px. */
+  @media (min-width:821px){#kmDay{font-size:17px;padding:5px 12px}}
   .prChip.on{background:#ff7a00;border-color:#b35300;font-weight:700}
   #prWrap{flex:1;position:relative;margin:0 8px 8px}
   #prSvg{width:100%;height:100%;display:block}
