@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.19.0 : chercher "v5.19" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.19.2 : chercher "v5.19" (Ctrl+U, Ctrl+F).
+     v5.19.2 = en 3F smartphone, pile de gauche REDUITE (32px :
+     ⛰ 🛰 🏔 moins envahissants sur la petite carte) + menu des
+     fonds rapproche et compact.
+     v5.19.1 = bouton 🏔 = MENU de fonds de carte (plan OSM,
+     relief OpenTopoMap, vélo CyclOSM) ; satellite 🛰 reste un
+     bouton separe. Ajout facile de nouveaux fonds dans VUES.
      v5.19.0 = BOUTON RELIEF 3D (🏔, pile zoom, a cote de 🛰) : fond
      OpenTopoMap (ombrage du terrain, courbes de niveau, altitudes).
      Le mode de fond passe d un booleen satellite a 3 etats plan/sat/
@@ -193,6 +199,12 @@
   #zoom button:active{background:#cc6200}
   /* v5.14 : bouton altimetrie (dans la pile #zoom) + panneau profil */
   #zoom button.on{background:#1f77e5;border-color:#123c6e}
+  /* v5.19.1 : menu de choix du fond de carte (bouton 🏔) */
+  #vueMenu{display:none;position:absolute;left:70px;top:10px;z-index:1200;flex-direction:column;gap:6px}
+  #vueMenu.open{display:flex}
+  #vueMenu button{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid #45526b;background:#1c2230ee;color:#eee;font-size:14px;cursor:pointer;backdrop-filter:blur(4px);box-shadow:0 3px 8px rgba(0,0,0,.45);white-space:nowrap}
+  #vueMenu button:hover{background:#2a3245}
+  #vueMenu button.on{background:#1f77e5;border-color:#123c6e}
   #profil{position:absolute;left:0;right:0;bottom:0;height:35%;background:#0d1117f2;border-top:2px solid #39445c;z-index:1002;display:none;flex-direction:column}
   #profil.on{display:flex}
   #prChips{display:flex;gap:6px;overflow-x:auto;padding:6px 8px;flex:0 0 auto;scrollbar-width:thin}
@@ -293,6 +305,14 @@
        date du media affiche ; les autres dates restent accessibles via
        les vues alti pleine hauteur (2F .alti ou 1F plein ecran). */
     #zoom #btProfil,#zoom #btSat,#zoom #btTopo{width:40px;height:40px;font-size:19px}
+    /* v5.19.2 : en 3F smartphone, la pile de gauche est REDUITE
+       (32px au lieu de 40) : la carte y est la plus petite vue et
+       ⛰/🛰/🏔 empietaient sur l'alti. Le menu des fonds suit (bouton
+       plus petit + decalage gauche plus court). */
+    #wrap.p3 #zoom button{width:32px;height:32px;font-size:15px}
+    #wrap.p3 #zoom #btProfil,#wrap.p3 #zoom #btSat,#wrap.p3 #zoom #btTopo{width:32px;height:32px;font-size:15px}
+    #wrap.p3 #vueMenu{left:48px}
+    #wrap.p3 #vueMenu button{padding:7px 10px;font-size:12px}
     #wrap:not(.alti):not(.showprofil) #profil.on #prChips{padding-top:6px}
     /* v5.15.3 : cas "3 fenetres" (2F photo+carte + ⛰ overlay) : photo
        masquee, barre du haut FLOTTANTE translucide par-dessus la carte,
@@ -415,7 +435,12 @@
     <div id="map"><div id="world"></div></div>
     <button id="btFlip" title="Revenir à la photo">⇅</button>
     <button id="btLayoutM" title="Affichage 2 fenêtres">⧉</button>
-    <div id="zoom"><button id="zin" title="Zoom +">+</button><button id="zout" title="Zoom −">−</button><button id="btProfil" title="Profil altimétrique">⛰</button><button id="btSat" title="Vue satellite (Esri)">🛰</button><button id="btTopo" title="Vue relief 3D (OpenTopoMap)">🏔</button></div>
+    <div id="zoom"><button id="zin" title="Zoom +">+</button><button id="zout" title="Zoom −">−</button><button id="btProfil" title="Profil altimétrique">⛰</button><button id="btSat" title="Vue satellite (Esri)">🛰</button><button id="btTopo" title="Choisir le fond de carte">🏔</button></div>
+    <div id="vueMenu">
+      <button data-vue="plan" title="Plan classique OpenStreetMap">🗺 Plan</button>
+      <button data-vue="topo" title="Relief : OpenTopoMap">🏔 Relief</button>
+      <button data-vue="cyclo" title="Vélo : CyclOSM (pistes, itinéraires)">🚲 Vélo</button>
+    </div>
     <div id="profil">
       <button id="prClose" title="Fermer l'altimétrie">✕</button>
       <button id="prHandle" title="Afficher les dates">⌄</button>
@@ -519,10 +544,23 @@ const tiles = new Map();
 // "topo" (OpenTopoMap : ombrage du terrain, courbes de niveau,
 // altitudes - la vue "relief 3D"). Un seul mode actif a la fois.
 let vue = "plan";
+// v5.19.1 : fonds disponibles. OpenTopoMap et CyclOSM sont servis
+// sur 3 sous-domaines (a/b/c) - rotation pour repartir la charge,
+// meme pratique que les tuiliers OSM. Tous en z/x/y standard.
+const VUES = {
+  plan:  { nom: "Plan",    url: k => "https://tile.openstreetmap.org/" + k + ".png" },
+  topo:  { nom: "Relief",  sub: ["a", "b", "c"],
+           url: (k, s) => "https://" + s + ".tile.opentopomap.org/" + k + ".png" },
+  cyclo: { nom: "Vélo",    sub: ["a", "b", "c"],
+           url: (k, s) => "https://" + s + ".tile-cyclosm.openstreetmap.fr/cyclosm/" + k + ".png" },
+};
 function setVue(v) {
   vue = v;
   document.getElementById("btSat").classList.toggle("on", vue === "sat");
-  document.getElementById("btTopo").classList.toggle("on", vue === "topo");
+  document.getElementById("btTopo").classList.toggle("on", vue !== "plan" && vue !== "sat");
+  document.querySelectorAll("#vueMenu button").forEach(b =>
+    b.classList.toggle("on", b.dataset.vue === vue));
+  document.getElementById("vueMenu").classList.remove("open");
   tiles.forEach(img => img.remove());   // vider le cache : autres tuiles
   tiles.clear();
   render();
@@ -539,18 +577,18 @@ function renderTiles() {
     if (tiles.has(key)) continue;
     const img = document.createElement("img");
     img.className = "tile";
-    // v5.16/v5.19 : plan OSM, satellite Esri ou relief OpenTopoMap.
+    // v5.19.1 : fond selon VUES (plan OSM / relief OpenTopoMap / vélo
+    // CyclOSM, via le menu 🏔) ou satellite Esri (bouton 🛰, a part).
     // Esri : /tile/{z}/{y}/{x} (y AVANT x, contrairement a OSM).
-    // OpenTopoMap : meme ordre z/x/y qu'OSM (tuiles plus lourdes,
-    // zoom max 17 - charge un peu plus lentement que le plan).
     if (vue === "sat") {
       const p = key.split("/");
       img.src = "https://server.arcgisonline.com/ArcGIS/rest/services/"
               + "World_Imagery/MapServer/tile/" + p[0] + "/" + p[2] + "/" + p[1];
-    } else if (vue === "topo") {
-      img.src = "https://tile.opentopomap.org/" + key + ".png";
     } else {
-      img.src = "https://tile.openstreetmap.org/" + key + ".png";
+      const V = VUES[vue] || VUES.plan;
+      // sous-domaine a/b/c reparti par tuile (equilibre de charge)
+      img.src = V.sub ? V.url(key, V.sub[(x + y) % 3])
+                      : V.url(key);
     }
     img.style.left = (x * 256) + "px";
     img.style.top = (y * 256) + "px";
@@ -1556,7 +1594,16 @@ document.getElementById("prSvg").addEventListener("click", e => {
 });
 document.getElementById("btProfil").onclick = toggleProfil;
 document.getElementById("btSat").onclick = () => setVue(vue === "sat" ? "plan" : "sat");   // v5.19
-document.getElementById("btTopo").onclick = () => setVue(vue === "topo" ? "plan" : "topo");   // v5.19 : relief 3D
+// v5.19.1 : bouton 🏔 = ouvrir/fermer le MENU des fonds de carte
+document.getElementById("btTopo").onclick = e => {
+  e.stopPropagation();
+  document.getElementById("vueMenu").classList.toggle("open");
+};
+document.querySelectorAll("#vueMenu button").forEach(b =>
+  b.onclick = e => { e.stopPropagation(); setVue(b.dataset.vue); });
+// fermer le menu si on clique ailleurs (carte, boutons...)
+document.addEventListener("click", () =>
+  document.getElementById("vueMenu").classList.remove("open"));
 // v5.15 : bouton ⛰ de l'ENTETE (mobile) - deux comportements :
 //  - 1 fenetre : alti PLEIN ECRAN (classe .showprofil), retour photo
 //    par le bouton flottant ⇅ (btFlip)
