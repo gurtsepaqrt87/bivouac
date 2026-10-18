@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.19.3 : chercher "v5.19" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.20.0 : chercher "v5.20" (Ctrl+U, Ctrl+F).
+     v5.20.0 = AXE TEMPOREL ADAPTATIF dans l alti : 1 journee =
+     reperes ~2 h, 2 = ~4 h, 3-4 = ~6 h, 5+ = date JJ/MM seule ;
+     placement dynamique haut/bas selon ou vit la courbe ; police
+     9 px discrete.
      v5.19.3 = badge km du jour AGRANDI sur laptop/desktop
      (17px + padding renforce ; mobile reste a 12px).
      v5.19.2 = en 3F smartphone, pile de gauche REDUITE (32px :
@@ -1524,6 +1528,51 @@ function drawProfilContent(svg, W, H) {
       sl.setAttribute("y1", 4); sl.setAttribute("y2", H - 16);
       sl.setAttribute("stroke", "#39445c");
       sl.setAttribute("stroke-dasharray", "3 4"); svg.appendChild(sl);
+    }
+  }
+  // v5.20 : ECHELLE TEMPORELLE ADAPTATIVE - granularite selon le
+  // nombre de journees : 1 journee -> 1 repere toutes les ~2 h dans
+  // les creneaux enregistres ; 2 -> ~4 h ; 3-4 -> ~6 h ; plus de 4
+  // -> uniquement la DATE (JJ/MM, sans annee) au debut de chaque
+  // journee. Placement DYNAMIQUE : la courbe vivant plutot en HAUT
+  // (fortes altitudes, nombreux sommets) -> etiquettes vers le BAS,
+  // et inversement - l'echelle se glisse dans la zone la plus vide
+  // pour gener au minimum les courbes. Police petite et discrete.
+  const nbJ = blocks.length;
+  const stepH = nbJ === 1 ? 2 : nbJ === 2 ? 4 : nbJ <= 4 ? 6 : 0;
+  let topN = 0, botN = 0;
+  const emid = (emin + emax) / 2;
+  for (const b of blocks) for (const p of b.pts) (p[1] >= emid ? topN++ : botN++);
+  const tY = topN > botN ? H - 6 : 18;   // courbe en haut -> bas, sinon haut
+  let lastX = -99;
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const b = blocks[bi];
+    const mkTick = (t, label) => {
+      const x = X(t);
+      if (x == null || x < 44 || x > W - 34 || x - lastX < 36) return;
+      lastX = x;
+      const tx = document.createElementNS(NSVG, "text");
+      tx.setAttribute("x", x); tx.setAttribute("y", tY);
+      tx.setAttribute("fill", "#8a94b0"); tx.setAttribute("font-size", "9");
+      tx.setAttribute("text-anchor", "middle");
+      tx.textContent = label; svg.appendChild(tx);
+      const tk = document.createElementNS(NSVG, "line");   // micro-repere
+      tk.setAttribute("x1", x); tk.setAttribute("x2", x);
+      tk.setAttribute("y1", tY === 18 ? tY + 2 : tY - 10);
+      tk.setAttribute("y2", tY === 18 ? tY + 6 : tY - 6);
+      tk.setAttribute("stroke", "#39445c"); svg.appendChild(tk);
+    };
+    if (stepH > 0) {                       // reperes horaires dans la journee
+      const st = stepH * 3600000;
+      const d0 = new Date(b.t0);           // aligne sur l'heure ronde locale
+      let t = b.t0 + (st - (d0.getMinutes() * 60000 + d0.getSeconds() * 1000
+                + d0.getMilliseconds()) % st) % st;
+      for (; t <= b.t1; t += st)
+        mkTick(t, new Date(t).getHours() + " h");
+    } else {                               // dates seules (5+ journees)
+      mkTick(b.t0 + (b.t1 - b.t0) / 2,
+             new Date(b.t0).toLocaleDateString("fr-FR",
+               { day: "2-digit", month: "2-digit" }));
     }
   }
   profilCursor();
