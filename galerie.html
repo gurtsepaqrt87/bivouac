@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.22.6 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.23.0 : chercher "v5.23" (Ctrl+U, Ctrl+F).
+     v5.23.0 = (1) FIX TRACES AU ZOOM MAX : coordonnees SVG en
+     pixels monde absolus (~8 M px au z16) -> precision perdue,
+     traces effacees au fort zoom. Desormais coordonnees RELATIVES
+     a la fenetre visible (traces ET live). (2) option Direct dans
+     le selecteur de dates en mode direct + badge km LIVE
+     approximatif "> xx km" (laptop et smartphone, vue photo).
      v5.22.6 = TIRETS du pointille live ECHELLES sur le zoom
      (dasharray ~x2 par niveau de zoom) : en pixels ecran, ils se
      serraient au dezoom jusqu a paraitre une ligne continue.
@@ -707,10 +713,20 @@ function renderTraces() {
   if (!traces.length) return;
   svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.id = "traces";
+  // v5.23 : PRECISION SVG - les coordonnees etaient en pixels MONDE
+  // absolus (~8 M px au zoom 16) : les rasteriseurs perdent la
+  // precision a ces echelles et le tracé S'EFFACE au fort zoom
+  // (bug reel : "tous les tracés disparaissent proche du zoom max").
+  // Parade (facon Leaflet) : coordonnees RELATIVES a la fenetre
+  // visible (quelques milliers de px), SVG positionne a (ox,oy) et
+  // dimensionne a la fenetre.
+  svg.style.left = ox + "px"; svg.style.top = oy + "px";
+  svg.style.width = mapEl.clientWidth + "px";
+  svg.style.height = mapEl.clientHeight + "px";
   for (const t of traces) {
     if (t.geometry.coordinates.length < 2) continue;
     const pts = t.geometry.coordinates
-      .map(c => lon2x(c[0], zoom) + "," + lat2y(c[1], zoom))
+      .map(c => (lon2x(c[0], zoom) - ox) + "," + (lat2y(c[1], zoom) - oy))
       .join(" ");
     const p = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
     p.setAttribute("points", pts);
@@ -740,6 +756,17 @@ function havKm(coords) {
 function updateKmDay() {
   const el = document.getElementById("kmDay");
   if (!el) return;
+  // v5.23 : MODE DIRECT -> km LIVE approximatif (trace live, points
+  // a 1/min : la vraie distance est celle du soir, Garmin) ; le ">"
+  // signale l'approximation.
+  if (liveMode) {
+    let t = 0;
+    for (const f of liveTrace) t += havKm(f.geometry.coordinates || []);
+    el.textContent = t > 0
+      ? "> " + String(t < 10 ? t.toFixed(1) : Math.round(t)).replace(".", ",") + " km"
+      : "";
+    return;
+  }
   const d = media[sel] ? media[sel].date : null;
   if (!d) { el.textContent = ""; return; }
   // 1) profil.json "km" (points NON decimes - garmin 1/s : precis)
@@ -861,11 +888,26 @@ async function enterLive() {
   // de la centrer sur la photo active - ancienne journee, hors trajet)
   clon = live.lon; clat = live.lat; render();
   renderLiveProbe();
+  // v5.23 : "📡 Direct" dans le selecteur de dates + km live dans le
+  // badge ("> xx km" : approximatif, granularite 1 pt/min)
+  const dSel = document.getElementById("btDate");
+  if (![...dSel.options].some(o => o.value === "__live__")) {
+    const o = document.createElement("option");
+    o.value = "__live__"; o.textContent = "📡 Direct";
+    dSel.appendChild(o);
+  }
+  dSel.value = "__live__";
+  updateKmDay();
   updLiveBtn();
 }
 function exitLive() {
   liveMode = false; liveProbe = null;
   wrapEl.classList.remove("direct");  // v5.22.1
+  // v5.23 : retirer l'option "📡 Direct" du selecteur de dates
+  const dSel = document.getElementById("btDate");
+  const oLive = [...dSel.options].find(o => o.value === "__live__");
+  if (oLive) oLive.remove();
+  if (media[sel]) dSel.value = media[sel].date;
   closeProfil();
   prManual = new Set(); prTouched = false;   // retour au defaut a la prochaine ouverture
   openGal(sel);                        // restaurer la photo affichee (galerie classique)
@@ -1021,11 +1063,16 @@ function render() {
     if (old) old.remove();
     const sg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     sg.id = "tracelive";
+    // v5.23 : coordonnees RELATIVES a la fenetre visible (precision
+    // SVG au fort zoom, voir renderTraces)
+    sg.style.left = ox + "px"; sg.style.top = oy + "px";
+    sg.style.width = mapEl.clientWidth + "px";
+    sg.style.height = mapEl.clientHeight + "px";
     for (const t of liveTrace) {
       if ((t.geometry.coordinates || []).length < 2) continue;
       const p = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
       p.setAttribute("points", t.geometry.coordinates
-        .map(c => lon2x(c[0], zoom) + "," + lat2y(c[1], zoom)).join(" "));
+        .map(c => (lon2x(c[0], zoom) - ox) + "," + (lat2y(c[1], zoom) - oy)).join(" "));
       p.setAttribute("fill", "none");
       // v5.22.5 : pointille ORANGE vif et EPAIS (etait gris 3px,
       // trop discret sur ecran smartphone - invisible sur petit
@@ -1455,6 +1502,7 @@ function buildDateMenu() {
   if (dates.length) dSel.value = dates[dates.length - 1];   // la plus recente par defaut
 }
 document.getElementById("btDate").addEventListener("change", e => {
+  if (e.target.value === "__live__") return;   // v5.23 : option Direct (pas une date)
   const i = media.findIndex(m => m.date === e.target.value);
   if (i >= 0) openGal(i);
 });
