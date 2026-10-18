@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.22.1 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.22.2 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+     v5.22.2 = FIX : le calque pointille de la trace live s EMPI LAIT
+     a chaque render (id duplique, jamais purges) - fuite + rendu
+     degrade au fil d une journee de live. id dedie + purge.
      v5.22.1 = FIXES TERRAIN (1re sortie testee) : (1) la carte se
      CENTRE sur la position live a l entree en mode direct + SUIVI a
      chaque nouveau point (le tracé pointille etait dessine mais
@@ -957,8 +960,14 @@ function render() {
   renderTiles(); renderTraces(); renderMarkers(); renderLive(); renderLiveProbe(); updateKmDay();
   // v5.17 : trace LIVE du jour en pointilles gris, SOUS les cumuls
   if (liveValid() && liveTrace.length) {
+    // v5.22.2 : id DEDIE + purge de l'ancien calque - chaque render()
+    // ajoutait un nouveau SVG sans retirer le precedent (id duplique,
+    // empilement a chaque poll 30 s : fuite + rendu de plus en plus
+    // lourd au fil d'une journee de live).
+    const old = document.getElementById("tracelive");
+    if (old) old.remove();
     const sg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    sg.id = "traces";
+    sg.id = "tracelive";
     for (const t of liveTrace) {
       if ((t.geometry.coordinates || []).length < 2) continue;
       const p = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
