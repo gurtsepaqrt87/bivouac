@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.22.5 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.22.6 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+     v5.22.6 = TIRETS du pointille live ECHELLES sur le zoom
+     (dasharray ~x2 par niveau de zoom) : en pixels ecran, ils se
+     serraient au dezoom jusqu a paraitre une ligne continue.
      v5.22.5 = pointille trace live ORANGE (#ff9f1c) et EPAIS (5px,
      etait gris 3px) - trop discret sur smartphone. Alti live et
      pointille laptop VALIDES sur replay.
@@ -1029,7 +1032,11 @@ function render() {
       // ecran malgre des donnees valides).
       p.setAttribute("stroke", "#ff9f1c");
       p.setAttribute("stroke-width", 5);
-      p.setAttribute("stroke-dasharray", "7 6");
+      // v5.22.6 : TIRETS ECHELLES SUR LE ZOOM - dasharray en pixels
+      // ecran, les tirets se serraient au dezoom jusqu a fusionner
+      // en ligne continue. Espacement ~doublable par niveau de zoom.
+      const dash = Math.max(6, Math.round(7 * Math.pow(2, zoom - 14)));
+      p.setAttribute("stroke-dasharray", dash + " " + Math.round(dash * 0.85));
       p.setAttribute("stroke-opacity", 0.9);
       p.setAttribute("stroke-linecap", "round");
       sg.appendChild(p);
