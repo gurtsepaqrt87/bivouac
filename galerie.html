@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.22.4 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.22.5 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+     v5.22.5 = pointille trace live ORANGE (#ff9f1c) et EPAIS (5px,
+     etait gris 3px) - trop discret sur smartphone. Alti live et
+     pointille laptop VALIDES sur replay.
      v5.22.4 = FIX CSS : le pointille live (id "tracelive" depuis
      v5.22.2) n avait PAS le positionnement absolute/overflow ->
      SVG de taille nulle, trace invisible (badge tr:1 pts:9 mais
@@ -1021,8 +1024,11 @@ function render() {
       p.setAttribute("points", t.geometry.coordinates
         .map(c => lon2x(c[0], zoom) + "," + lat2y(c[1], zoom)).join(" "));
       p.setAttribute("fill", "none");
-      p.setAttribute("stroke", "#555");
-      p.setAttribute("stroke-width", 3);
+      // v5.22.5 : pointille ORANGE vif et EPAIS (etait gris 3px,
+      // trop discret sur ecran smartphone - invisible sur petit
+      // ecran malgre des donnees valides).
+      p.setAttribute("stroke", "#ff9f1c");
+      p.setAttribute("stroke-width", 5);
       p.setAttribute("stroke-dasharray", "7 6");
       p.setAttribute("stroke-opacity", 0.9);
       p.setAttribute("stroke-linecap", "round");
