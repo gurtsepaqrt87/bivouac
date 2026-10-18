@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.22.3 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.22.4 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+     v5.22.4 = FIX CSS : le pointille live (id "tracelive" depuis
+     v5.22.2) n avait PAS le positionnement absolute/overflow ->
+     SVG de taille nulle, trace invisible (badge tr:1 pts:9 mais
+     rien sur la carte). Alti live VALIDE sur replay (courbe qui
+     grandit, pts = gpx decime 1/2 - attendu).
      v5.22.3 = FIX TRACE LIVE : le geojson n etait charge QUE si
      live.json changeait - un seul echec le laissait vide A VIE
      (curseur OK, pointille + alti morts : cas reel console,
@@ -222,6 +227,11 @@
   #world{position:absolute;left:0;top:0;width:0;height:0}
   .tile{position:absolute;width:256px;height:256px;border:none}
   #traces{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+  /* v5.22.4 : le calque de la trace LIVE (id renomme "tracelive" en
+     v5.22.2) n'avait PLUS ce positionnement -> SVG taille nulle,
+     pointille invisible malgre des donnees valides (cas reel :
+     tr:1 pts:9 mais rien sur la carte). */
+  #tracelive{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
   /* v5.17 : marqueur LIVE pulsant (position gpslogger du jour) */
   .mklive{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#ff7a00;border:2.5px solid #fff;animation:livepulse 2s infinite;pointer-events:none;z-index:5}
   .mklive.pause{background:#8a8f98;animation:none}
