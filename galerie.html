@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.22.0 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.22.1 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+     v5.22.1 = FIXES TERRAIN (1re sortie testee) : (1) la carte se
+     CENTRE sur la position live a l entree en mode direct + SUIVI a
+     chaque nouveau point (le tracé pointille etait dessine mais
+     HORS ECRAN, carte centree sur l ancienne journee). (2) mobile :
+     vraie 2F carte+alti (photo masquee en direct, classe .direct).
      v5.22.0 = MODE DIRECT (bouton 📡 bas droite de la carte, visible
      si le live est actif, clignote 6 s aux demarrages) : alti de la
      journee live (live.py v1.1 : ele + times), curseur HEURE ACTIVE
@@ -413,6 +418,12 @@
        plus specifiques gagnent sur celles du 2F/1F ci-dessus. */
     #wrap.p3 .mk .icon{transform:scale(.67)}
     #wrap.p3 .mk.sel .icon{transform:scale(1.1)}
+    /* v5.22.1 : MODE DIRECT mobile = vraie 2F CARTE+ALTI : la fenetre
+       photo est masquee (le cycliste y est visible seulement depuis
+       la vue classique, tap 📡 pour y revenir) et l'alti gagne la
+       place (45%). */
+    #wrap.p3.direct #side{display:none}
+    #wrap.p3.direct #profil{height:45%}
     /* styles communs des poignees ⌄ (barre du haut, puces alti) */
     #shHandle,#prHandle{position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:1501;height:26px;padding:0 14px;border-radius:0 0 10px 10px;border:1px solid #b35300;border-top:none;background:#ff7a00cc;color:#fff;font-size:14px;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(3px)}
     /* l'URL/nom de fichier n'apporte rien sur mobile : date deja dans
@@ -744,7 +755,13 @@ async function pollLive() {
       catch (e) { liveTrace = []; }
       parseLivePts();                   // v5.22 : mode direct
       render();
-      if (liveMode) { drawProfil(); showCyclist(); renderLiveProbe(); }
+      if (liveMode) {
+        // v5.22.1 : SUIVI - chaque nouveau point recentre la carte sur
+        // la position live (le pan manuel est repris au signal suivant,
+        // <= 2 min : c'est le but du suivi en direct).
+        if (liveMoving()) { clon = live.lon; clat = live.lat; render(); }
+        drawProfil(); showCyclist(); renderLiveProbe();
+      }
     } else { live = j; renderLive(); }
     updLiveBtn();                       // v5.22 : bouton/clignotement/exit auto
   } catch (e) { /* live.json absent (feature OFF ou jamais poussee) */
@@ -787,16 +804,21 @@ function updLiveBtn() {
 }
 async function enterLive() {
   liveMode = true; liveProbe = null;
-  await openProfil();                  // laptop : alti sous la carte ; mobile : 2F carte+alti (p3)
+  await openProfil();                  // laptop : alti sous la carte ; mobile : p3 carte+alti
+  wrapEl.classList.add("direct");      // v5.22.1 : mobile -> photo masquee (2F carte+alti)
   prManual = new Set([live.date]);     // le graphe ne trace QUE la journee live
   prTouched = true;
   syncPrDates(); drawProfil();
   showCyclist();
+  // v5.22.1 : la carte se CENTRE sur la position live (openProfil vient
+  // de la centrer sur la photo active - ancienne journee, hors trajet)
+  clon = live.lon; clat = live.lat; render();
   renderLiveProbe();
   updLiveBtn();
 }
 function exitLive() {
   liveMode = false; liveProbe = null;
+  wrapEl.classList.remove("direct");  // v5.22.1
   closeProfil();
   prManual = new Set(); prTouched = false;   // retour au defaut a la prochaine ouverture
   openGal(sel);                        // restaurer la photo affichee (galerie classique)
