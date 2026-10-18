@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.23.0 : chercher "v5.23" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.23.1 : chercher "v5.23" (Ctrl+U, Ctrl+F).
+     v5.23.1 = (a) LIVE en ROUGE vif #e63946 (trace pointillee +
+     pointeur live, etait orange). (b) bloc commentaire/photo de
+     l ancienne photo MASQUE en mode direct (restaure a la sortie).
+     (c) badge de debug tr:/pts:/age: RETIRE (live valide terrain).
      v5.23.0 = (1) FIX TRACES AU ZOOM MAX : coordonnees SVG en
      pixels monde absolus (~8 M px au z16) -> precision perdue,
      traces effacees au fort zoom. Desormais coordonnees RELATIVES
@@ -245,7 +249,7 @@
      tr:1 pts:9 mais rien sur la carte). */
   #tracelive{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
   /* v5.17 : marqueur LIVE pulsant (position gpslogger du jour) */
-  .mklive{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#ff7a00;border:2.5px solid #fff;animation:livepulse 2s infinite;pointer-events:none;z-index:5}
+  .mklive{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#e63946;border:2.5px solid #fff;animation:livepulse 2s infinite;pointer-events:none;z-index:5}
   .mklive.pause{background:#8a8f98;animation:none}
   @keyframes livepulse{0%{box-shadow:0 0 0 0 rgba(255,122,0,.7)}70%{box-shadow:0 0 0 16px rgba(255,122,0,0)}100%{box-shadow:0 0 0 0 rgba(255,122,0,0)}}
   .mk{position:absolute;transform:translate(-50%,-100%);cursor:pointer;line-height:0}
@@ -291,11 +295,6 @@
   #btLive:hover{background:#3a7f62}
   #btLive.on{background:#ff7a00;border-color:#b35300}
   #btLive.blink{animation:liveblink .7s steps(2,start) 9}
-  /* v5.22.3 : badge DIAGNOSTIC live (temporaire, sous le bouton) -
-     visible seulement en mode direct : trace:N = points recus du
-     geojson, pts:N = points decodes, age:min = age du dernier signal.
-     Sert au debug terrain ; a retirer quand le live est valide. */
-  #dbgLive{position:absolute;right:10px;bottom:54px;z-index:1100;display:none;padding:4px 8px;border-radius:8px;background:#000000cc;color:#8a94b0;font-size:11px;font-family:monospace;pointer-events:none}
   @keyframes liveblink{50%{opacity:.2}}
   /* v5.22 : sonde live (point tape sur la trace/courbe) + cycliste */
   #mkprobe{position:absolute;z-index:600;transform:translate(-50%,-100%);text-align:center;line-height:1}
@@ -547,7 +546,6 @@
       <a id="btMap" href="https://umap.openstreetmap.fr/fr/map/cyclo_1463865" target="_blank" title="Ouvrir la carte uMap">🗺 Carte uMap</a>
     </div>
     <button id="btLive" title="Mode direct : alti live + cycliste">📡 Direct</button>
-    <div id="dbgLive"></div>
   </div>
 </div>
 <div id="err"></div>
@@ -838,7 +836,6 @@ async function pollLive() {
     updLiveBtn();                       // v5.22 : bouton/clignotement/exit auto
   } catch (e) { /* live.json absent (feature OFF ou jamais poussee) */
     updLiveBtn(); }
-  updDbg();                             // v5.22.3 : badge diagnostic
 }
 
 // ---------- v5.22 : MODE DIRECT (live <> classique) ----------
@@ -874,7 +871,6 @@ function updLiveBtn() {
   liveWasMov = mov;
   // live coupe (widget OFF) ou perime -> retour automatique au classique
   if (!ok && liveMode) exitLive();
-  updDbg();                            // v5.22.3 : badge diagnostic
 }
 async function enterLive() {
   liveMode = true; liveProbe = null;
@@ -908,20 +904,12 @@ function exitLive() {
   const oLive = [...dSel.options].find(o => o.value === "__live__");
   if (oLive) oLive.remove();
   if (media[sel]) dSel.value = media[sel].date;
+  document.getElementById("cap").style.display = "";   // v5.23.1 : restaurer le bloc photo
   closeProfil();
   prManual = new Set(); prTouched = false;   // retour au defaut a la prochaine ouverture
   openGal(sel);                        // restaurer la photo affichee (galerie classique)
   render();
   updLiveBtn();
-}
-function updDbg() {                    // v5.22.3 : badge diagnostic live
-  const el = document.getElementById("dbgLive");
-  if (!el) return;
-  if (!liveMode) { el.style.display = "none"; return; }
-  const age = live ? Math.round((Date.now() / 1000 - live.t) / 60) : "?";
-  el.textContent = "tr:" + liveTrace.length + " pts:" + livePts.length
-                 + " age:" + age + "min";
-  el.style.display = "block";
 }
 document.getElementById("btLive").onclick = e => {
   e.stopPropagation();
@@ -963,6 +951,10 @@ function showCyclist() {
   if (!liveMode || !liveValid()) return;
   mediaEl.innerHTML = "";
   mediaEl.insertAdjacentHTML("beforeend", cyclistSVG());
+  // v5.23.1 : masquer le bloc commentaire/photo de l'ANCIENNE photo -
+  // il affichait encore le texte de la derniere photo processée, sans
+  // objet en mode direct (le cycliste n'a ni nom ni date ni comm.).
+  document.getElementById("cap").style.display = "none";
 }
 // sonde carte<->profil : point tape (trace ou courbe) + heure la plus proche
 function renderLiveProbe() {
@@ -1074,10 +1066,8 @@ function render() {
       p.setAttribute("points", t.geometry.coordinates
         .map(c => (lon2x(c[0], zoom) - ox) + "," + (lat2y(c[1], zoom) - oy)).join(" "));
       p.setAttribute("fill", "none");
-      // v5.22.5 : pointille ORANGE vif et EPAIS (etait gris 3px,
-      // trop discret sur ecran smartphone - invisible sur petit
-      // ecran malgre des donnees valides).
-      p.setAttribute("stroke", "#ff9f1c");
+      // v5.23.1 : ROUGE vif (#e63946) pour la visibilite (etait orange).
+      p.setAttribute("stroke", "#e63946");
       p.setAttribute("stroke-width", 5);
       // v5.22.6 : TIRETS ECHELLES SUR LE ZOOM - dasharray en pixels
       // ecran, les tirets se serraient au dezoom jusqu a fusionner
