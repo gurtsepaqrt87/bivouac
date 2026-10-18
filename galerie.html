@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.20.0 : chercher "v5.20" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.21.0 : chercher "v5.21" (Ctrl+U, Ctrl+F).
+     v5.21.0 = (1) echelle temporelle alti AFFINEE : mobile 1j=1h,
+     2j=2h, 3-4j=6h, toujours en BAS ; laptop 1j=30min, 2j=1h,
+     3-4j=2h, placement dynamique conserve. (2) DESELECTION de la
+     date active possible dans l alti (puces) une premiere puce
+     touchee bloque l ajout auto de la date photo ; tout
+     deselectionner = graphe vide ; reouverture = retour au defaut.
+     (3) fond IGN (PLANIGNV2, Geoportail, sans cle) dans le menu 🏔.
      v5.20.0 = AXE TEMPOREL ADAPTATIF dans l alti : 1 journee =
      reperes ~2 h, 2 = ~4 h, 3-4 = ~6 h, 5+ = date JJ/MM seule ;
      placement dynamique haut/bas selon ou vit la courbe ; police
@@ -449,6 +456,7 @@
       <button data-vue="plan" title="Plan classique OpenStreetMap">🗺 Plan</button>
       <button data-vue="topo" title="Relief : OpenTopoMap">🏔 Relief</button>
       <button data-vue="cyclo" title="Vélo : CyclOSM (pistes, itinéraires)">🚲 Vélo</button>
+      <button data-vue="ign" title="Plan IGN (Géoportail)">🇫🇷 IGN</button>
     </div>
     <div id="profil">
       <button id="prClose" title="Fermer l'altimétrie">✕</button>
@@ -562,6 +570,16 @@ const VUES = {
            url: (k, s) => "https://" + s + ".tile.opentopomap.org/" + k + ".png" },
   cyclo: { nom: "Vélo",    sub: ["a", "b", "c"],
            url: (k, s) => "https://" + s + ".tile-cyclosm.openstreetmap.fr/cyclosm/" + k + ".png" },
+  // v5.21 : IGN - plan IGN v2 (Géoportail, libre d'acces, sans cle).
+  // WMTS : ordre par parametres (z=TILEMATRIX, x=TILECOL, y=TILEROW),
+  // pas par chemin comme OSM. Zoom max 19.
+  ign:   { nom: "IGN",     url: k => {
+            const p = k.split("/");
+            return "https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0"
+                 + "&REQUEST=GetTile&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2"
+                 + "&STYLE=normal&FORMAT=image%2Fpng&TILEMATRIXSET=PM"
+                 + "&TILEMATRIX=" + p[0] + "&TILEROW=" + p[2] + "&TILECOL=" + p[1];
+          } },
 };
 function setVue(v) {
   vue = v;
@@ -1206,11 +1224,18 @@ let lastPrMode = null, lastPrH = 0, lastPrW = 0;
 // = dates cochees MANUELLEMENT (puces) U la date de la photo affichee.
 // Changer la date via le menu du haut passiverise l'ancienne date auto
 // et active la nouvelle ; les puces cochees a la main restent.
-let prManual = new Set();
+let prManual = new Set(), prTouched = false;
 function syncPrDates() {
   const auto = media[sel] ? media[sel].date : null;
   prDates = new Set(prManual);
-  if (auto) prDates.add(auto);
+  // v5.21 : tant que l'utilisateur n'a pas touche aux puces, la date
+  // de la photo reste ajoutee automatiquement (comportement v5.15.10).
+  // Des le 1er clic sur une puce, prTouched bloque l'ajout auto : on
+  // peut alors DESELECTIONNER la date active (cas 2F carte+alti ou la
+  // photo n'est pas visible) ; tout deselectionner -> graphe vide.
+  // La "date photo" suivra la derniere selection faite dans le graphe,
+  // ou aucune - au prochain ouverture du panneau, retour au defaut.
+  if (!prTouched && auto) prDates.add(auto);
 }
 const NSVG = "http://www.w3.org/2000/svg";
 function photoEpoch(m) {
@@ -1254,10 +1279,12 @@ async function openProfil() {
       const c = document.createElement("span");
       c.className = "prChip"; c.textContent = d;
       c.onclick = () => { prManual.has(d) ? prManual.delete(d) : prManual.add(d);
+                           prTouched = true;            // v5.21 : plus d'ajout auto
                            syncPrDates(); drawProfil(); };
       chips.appendChild(c);
     }
   }
+  prTouched = false;                   // v5.21 : chaque ouverture repart du defaut (date photo auto)
   syncPrDates();                      // v5.15.10 : manuelles + date photo
   drawProfil();
   chipsFlash(6000);                    // v5.15.12 : grille dates visible 6 s a l'ouverture
@@ -1530,20 +1557,24 @@ function drawProfilContent(svg, W, H) {
       sl.setAttribute("stroke-dasharray", "3 4"); svg.appendChild(sl);
     }
   }
-  // v5.20 : ECHELLE TEMPORELLE ADAPTATIVE - granularite selon le
-  // nombre de journees : 1 journee -> 1 repere toutes les ~2 h dans
-  // les creneaux enregistres ; 2 -> ~4 h ; 3-4 -> ~6 h ; plus de 4
-  // -> uniquement la DATE (JJ/MM, sans annee) au debut de chaque
-  // journee. Placement DYNAMIQUE : la courbe vivant plutot en HAUT
-  // (fortes altitudes, nombreux sommets) -> etiquettes vers le BAS,
-  // et inversement - l'echelle se glisse dans la zone la plus vide
-  // pour gener au minimum les courbes. Police petite et discrete.
+  // v5.20/v5.21 : ECHELLE TEMPORELLE ADAPTATIVE.
+  // v5.21 : granularité plus fine ET differenciee MOBILE / laptop :
+  //  - smartphone (etiquettes TOUJOURS en bas, ne varient plus) :
+  //    1 journée -> 1 h ; 2 -> 2 h ; 3-4 -> 6 h (>= 2 repères/jour).
+  //  - laptop (fenêtre large, placement dynamique conserve haut/bas
+  //    selon où vit la courbe) : 1 journée -> 30 min ; 2 -> 1 h ;
+  //    3-4 -> 2 h.
+  //  - 5+ journées -> uniquement la DATE (JJ/MM, sans année).
+  // Police 9 px discrete, micro-tirets, anti-collision 36 px.
   const nbJ = blocks.length;
-  const stepH = nbJ === 1 ? 2 : nbJ === 2 ? 4 : nbJ <= 4 ? 6 : 0;
+  const stepH = MOBILE
+    ? (nbJ === 1 ? 1 : nbJ === 2 ? 2 : nbJ <= 4 ? 6 : 0)
+    : (nbJ === 1 ? 0.5 : nbJ === 2 ? 1 : nbJ <= 4 ? 2 : 0);
   let topN = 0, botN = 0;
   const emid = (emin + emax) / 2;
   for (const b of blocks) for (const p of b.pts) (p[1] >= emid ? topN++ : botN++);
-  const tY = topN > botN ? H - 6 : 18;   // courbe en haut -> bas, sinon haut
+  // v5.21 : mobile TOUJOURS en bas ; laptop garde le placement dynamique
+  const tY = MOBILE ? H - 6 : (topN > botN ? H - 6 : 18);
   let lastX = -99;
   for (let bi = 0; bi < blocks.length; bi++) {
     const b = blocks[bi];
@@ -1567,8 +1598,12 @@ function drawProfilContent(svg, W, H) {
       const d0 = new Date(b.t0);           // aligne sur l'heure ronde locale
       let t = b.t0 + (st - (d0.getMinutes() * 60000 + d0.getSeconds() * 1000
                 + d0.getMilliseconds()) % st) % st;
-      for (; t <= b.t1; t += st)
-        mkTick(t, new Date(t).getHours() + " h");
+      for (; t <= b.t1; t += st) {
+        const dt = new Date(t);            // v5.21 : "8 h" ou "8 h 30"
+        mkTick(t, dt.getMinutes()
+                 ? dt.getHours() + " h " + dt.getMinutes()
+                 : dt.getHours() + " h");
+      }
     } else {                               // dates seules (5+ journees)
       mkTick(b.t0 + (b.t1 - b.t0) / 2,
              new Date(b.t0).toLocaleDateString("fr-FR",
