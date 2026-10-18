@@ -1,9 +1,18 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.22.2 : chercher "v5.22" (Ctrl+U, Ctrl+F).
-     v5.22.2 = FIX : le calque pointille de la trace live s EMPI LAIT
+<!-- VERSION v5.22.3 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+     v5.22.3 = FIX TRACE LIVE : le geojson n etait charge QUE si
+     live.json changeait - un seul echec le laissait vide A VIE
+     (curseur OK, pointille + alti morts : cas reel console,
+     liveTrace.length=0). Rechargement si change OU vide, + badge
+     DIAGNOSTIC en mode direct (tr:/pts:/age:) pour lire l etat
+     a l ecran sans console.
+     v5.22.2 = FIX : (a) le calque pointille de la trace live s EMPI LAIT
      a chaque render (id duplique, jamais purges) - fuite + rendu
      degrade au fil d une journee de live. id dedie + purge.
+     (b) echec de chargement de live_trace.geojson desormais LOGGE en
+     console (avant : avale silencieusement -> pointille et alti live
+     vides sans aucune piste de diagnostic).
      v5.22.1 = FIXES TERRAIN (1re sortie testee) : (1) la carte se
      CENTRE sur la position live a l entree en mode direct + SUIVI a
      chaque nouveau point (le tracé pointille etait dessine mais
@@ -260,6 +269,11 @@
   #btLive:hover{background:#3a7f62}
   #btLive.on{background:#ff7a00;border-color:#b35300}
   #btLive.blink{animation:liveblink .7s steps(2,start) 9}
+  /* v5.22.3 : badge DIAGNOSTIC live (temporaire, sous le bouton) -
+     visible seulement en mode direct : trace:N = points recus du
+     geojson, pts:N = points decodes, age:min = age du dernier signal.
+     Sert au debug terrain ; a retirer quand le live est valide. */
+  #dbgLive{position:absolute;right:10px;bottom:54px;z-index:1100;display:none;padding:4px 8px;border-radius:8px;background:#000000cc;color:#8a94b0;font-size:11px;font-family:monospace;pointer-events:none}
   @keyframes liveblink{50%{opacity:.2}}
   /* v5.22 : sonde live (point tape sur la trace/courbe) + cycliste */
   #mkprobe{position:absolute;z-index:600;transform:translate(-50%,-100%);text-align:center;line-height:1}
@@ -511,6 +525,7 @@
       <a id="btMap" href="https://umap.openstreetmap.fr/fr/map/cyclo_1463865" target="_blank" title="Ouvrir la carte uMap">🗺 Carte uMap</a>
     </div>
     <button id="btLive" title="Mode direct : alti live + cycliste">📡 Direct</button>
+    <div id="dbgLive"></div>
   </div>
 </div>
 <div id="err"></div>
@@ -752,10 +767,21 @@ function renderLive() {
 async function pollLive() {
   try {
     const j = await (await fetch(BASE + "/live.json?v=" + Date.now())).json();
-    if (!live || j.t !== live.t || (j.n || 0) !== (live.n || 0)) {
-      live = j;
-      try { liveTrace = (await (await fetch(BASE + "/live_trace.geojson?v=" + Date.now()))).json().features || []; }
-      catch (e) { liveTrace = []; }
+    const changed = !live || j.t !== live.t || (j.n || 0) !== (live.n || 0);
+    live = j;
+    // v5.22.3 : la trace est (re)chargee si live.json change OU si on
+    // n'en a PAS ENCORE une (le chargement unique d'avant restait
+    // vide a vie des qu'un fetch echouait une fois - curseur OK mais
+    // pointille/alti morts : cas reel diagnostique en console,
+    // liveTrace.length=0 avec live.json sain).
+    if (changed || !liveTrace.length) {
+      try {
+        const g = await (await fetch(BASE + "/live_trace.geojson?v=" + Date.now())).json();
+        liveTrace = g.features || [];
+        // v5.22.2 : ne plus avaler les anomalies silencieusement.
+        if (!g.features) console.warn("live_trace.geojson: pas de features", g);
+      } catch (e) { liveTrace = [];
+        console.warn("live_trace.geojson: echec chargement", e); }
       parseLivePts();                   // v5.22 : mode direct
       render();
       if (liveMode) {
@@ -765,10 +791,11 @@ async function pollLive() {
         if (liveMoving()) { clon = live.lon; clat = live.lat; render(); }
         drawProfil(); showCyclist(); renderLiveProbe();
       }
-    } else { live = j; renderLive(); }
+    } else { renderLive(); }
     updLiveBtn();                       // v5.22 : bouton/clignotement/exit auto
   } catch (e) { /* live.json absent (feature OFF ou jamais poussee) */
     updLiveBtn(); }
+  updDbg();                             // v5.22.3 : badge diagnostic
 }
 
 // ---------- v5.22 : MODE DIRECT (live <> classique) ----------
@@ -804,6 +831,7 @@ function updLiveBtn() {
   liveWasMov = mov;
   // live coupe (widget OFF) ou perime -> retour automatique au classique
   if (!ok && liveMode) exitLive();
+  updDbg();                            // v5.22.3 : badge diagnostic
 }
 async function enterLive() {
   liveMode = true; liveProbe = null;
@@ -827,6 +855,15 @@ function exitLive() {
   openGal(sel);                        // restaurer la photo affichee (galerie classique)
   render();
   updLiveBtn();
+}
+function updDbg() {                    // v5.22.3 : badge diagnostic live
+  const el = document.getElementById("dbgLive");
+  if (!el) return;
+  if (!liveMode) { el.style.display = "none"; return; }
+  const age = live ? Math.round((Date.now() / 1000 - live.t) / 60) : "?";
+  el.textContent = "tr:" + liveTrace.length + " pts:" + livePts.length
+                 + " age:" + age + "min";
+  el.style.display = "block";
 }
 document.getElementById("btLive").onclick = e => {
   e.stopPropagation();
