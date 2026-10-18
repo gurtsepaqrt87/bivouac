@@ -1,6 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.21.0 : chercher "v5.21" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.22.0 : chercher "v5.22" (Ctrl+U, Ctrl+F).
+     v5.22.0 = MODE DIRECT (bouton 📡 bas droite de la carte, visible
+     si le live est actif, clignote 6 s aux demarrages) : alti de la
+     journee live (live.py v1.1 : ele + times), curseur HEURE ACTIVE
+     orange + sonde jaune ; cycliste anime (pedalage) ou au repos
+     (pause > 10 min) dans la fenetre photo ; laptop = alti sous la
+     carte, mobile = 2F carte+alti ; tap courbe <-> tap trace = sonde
+     croisee avec heure la plus proche ; live OFF/perime = retour auto
+     au classique.
      v5.21.0 = (1) echelle temporelle alti AFFINEE : mobile 1j=1h,
      2j=2h, 3-4j=6h, toujours en BAS ; laptop 1j=30min, 2j=1h,
      3-4j=2h, placement dynamique conserve. (2) DESELECTION de la
@@ -237,6 +245,27 @@
   #bar button.on{background:#2d6a4f;border-color:#40916c}
   #bar a{padding:16px 24px;border-radius:12px;border:2px solid #2f6db3;background:#1b3a63ee;color:#fff;font-size:20px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;backdrop-filter:blur(4px);box-shadow:0 3px 8px rgba(0,0,0,.45)}
   #bar a:hover{background:#255089}
+  /* v5.22 : bouton MODE DIRECT (bas droite de la carte) - visible
+     des que le live est valide ; clignote 6 s aux (re)demarrages
+     du deplacement ; actif (vert) en mode direct. */
+  #btLive{position:absolute;right:10px;bottom:10px;z-index:1100;display:none;align-items:center;gap:6px;padding:9px 13px;border-radius:10px;border:1px solid #40916c;background:#2d6a4fee;color:#fff;font-size:14px;font-weight:700;cursor:pointer;backdrop-filter:blur(4px);box-shadow:0 3px 8px rgba(0,0,0,.45)}
+  #btLive:hover{background:#3a7f62}
+  #btLive.on{background:#ff7a00;border-color:#b35300}
+  #btLive.blink{animation:liveblink .7s steps(2,start) 9}
+  @keyframes liveblink{50%{opacity:.2}}
+  /* v5.22 : sonde live (point tape sur la trace/courbe) + cycliste */
+  #mkprobe{position:absolute;z-index:600;transform:translate(-50%,-100%);text-align:center;line-height:1}
+  #mkprobe .d{width:12px;height:12px;border-radius:50%;background:#ffd60a;border:2px solid #fff;margin:0 auto;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+  #mkprobe .h{font-size:11px;font-weight:700;color:#ffd60a;text-shadow:0 1px 2px #000;padding:2px 4px}
+  #cyc{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#0d1117}
+  #cyc svg{width:min(72%,320px);height:auto}
+  #cyc .roue{transform-origin:center;transform-box:fill-box}
+  #cyc .jambe{transform-origin:0 0;transform-box:fill-box}
+  #cyc.mov .roue{animation:cycspin .9s linear infinite}
+  #cyc.mov .jambe{animation:cycped .55s ease-in-out infinite alternate}
+  #cyc.mov .jambe.j2{animation-delay:-.275s}
+  @keyframes cycspin{to{transform:rotate(360deg)}}
+  @keyframes cycped{from{transform:rotate(26deg)}to{transform:rotate(-26deg)}}
   .nav{flex:0 0 64px;height:56px;font-size:28px;font-weight:700;background:#ff7a00;border:2px solid #b35300;color:#fff;cursor:pointer;border-radius:10px;box-shadow:0 3px 8px rgba(0,0,0,.45)}
   .nav:hover{background:#ffa040}
   .nav:active{background:#cc6200}
@@ -467,6 +496,7 @@
     <div id="bar">
       <a id="btMap" href="https://umap.openstreetmap.fr/fr/map/cyclo_1463865" target="_blank" title="Ouvrir la carte uMap">🗺 Carte uMap</a>
     </div>
+    <button id="btLive" title="Mode direct : alti live + cycliste">📡 Direct</button>
   </div>
 </div>
 <div id="err"></div>
@@ -712,10 +742,141 @@ async function pollLive() {
       live = j;
       try { liveTrace = (await (await fetch(BASE + "/live_trace.geojson?v=" + Date.now()))).json().features || []; }
       catch (e) { liveTrace = []; }
+      parseLivePts();                   // v5.22 : mode direct
       render();
+      if (liveMode) { drawProfil(); showCyclist(); renderLiveProbe(); }
     } else { live = j; renderLive(); }
-  } catch (e) { /* live.json absent (feature OFF ou jamais poussee) */ }
+    updLiveBtn();                       // v5.22 : bouton/clignotement/exit auto
+  } catch (e) { /* live.json absent (feature OFF ou jamais poussee) */
+    updLiveBtn(); }
 }
+
+// ---------- v5.22 : MODE DIRECT (live <> classique) ----------
+let liveMode = false, livePts = [], liveProbe = null, probeEl = null, liveWasMov = false;
+function liveMoving() { return liveValid() && (Date.now() / 1000 - live.t) < 600; }
+function fmtH(t) {                      // epoch s -> "HH:MM"
+  const d = new Date(t * 1000);
+  return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+function parseLivePts() {              // v1.1 de live.py : 3D + times
+  livePts = [];
+  for (const f of liveTrace) {
+    const cs = f.geometry.coordinates || [], ts = (f.properties || {}).times || [];
+    for (let i = 0; i < cs.length; i++)
+      livePts.push({ lon: cs[i][0], lat: cs[i][1],
+                     ele: cs[i][2] != null ? cs[i][2] : null,
+                     t: ts[i] || live.t });
+  }
+  livePts.sort((a, b) => a.t - b.t);
+}
+function updLiveBtn() {
+  const b = document.getElementById("btLive");
+  const ok = liveValid();
+  b.style.display = ok ? "flex" : "none";
+  b.classList.toggle("on", liveMode);
+  const mov = liveMoving();
+  // clignote 6 s a chaque (re)demarrage du deplacement (apres pause)
+  if (ok && mov && !liveWasMov) {
+    b.classList.add("blink");
+    setTimeout(() => b.classList.remove("blink"), 6300);
+  }
+  if (!mov) b.classList.remove("blink");
+  liveWasMov = mov;
+  // live coupe (widget OFF) ou perime -> retour automatique au classique
+  if (!ok && liveMode) exitLive();
+}
+async function enterLive() {
+  liveMode = true; liveProbe = null;
+  await openProfil();                  // laptop : alti sous la carte ; mobile : 2F carte+alti (p3)
+  prManual = new Set([live.date]);     // le graphe ne trace QUE la journee live
+  prTouched = true;
+  syncPrDates(); drawProfil();
+  showCyclist();
+  renderLiveProbe();
+  updLiveBtn();
+}
+function exitLive() {
+  liveMode = false; liveProbe = null;
+  closeProfil();
+  prManual = new Set(); prTouched = false;   // retour au defaut a la prochaine ouverture
+  openGal(sel);                        // restaurer la photo affichee (galerie classique)
+  render();
+  updLiveBtn();
+}
+document.getElementById("btLive").onclick = e => {
+  e.stopPropagation();
+  if (liveMode) exitLive();
+  else if (liveValid()) enterLive();
+};
+// cycliste anime (pedalage) ou au repos (pause > 10 min) dans la fenetre photo
+function cyclistSVG() {
+  const mov = liveMoving();
+  const jambe = (x, y, c) => '<g class="jambe' + (c ? ' j2' : '') + '">' +
+    '<line x1="' + x + '" y1="' + y + '" x2="' + x + '" y2="' + (y + 26) + '" stroke="#1c2230" stroke-width="6" stroke-linecap="round"/>' +
+    '<circle cx="' + x + '" cy="' + (y + 30) + '" r="5" fill="#1c2230"/></g>';
+  return '<div id="cyc" class="' + (mov ? "mov" : "") + '">' +
+    '<svg viewBox="0 0 300 200" fill="none">' +
+    // roues
+    '<g class="roue"><circle cx="80" cy="150" r="30" stroke="#8a94b0" stroke-width="5"/>' +
+    '<line x1="80" y1="122" x2="80" y2="178" stroke="#8a94b0" stroke-width="2"/>' +
+    '<line x1="52" y1="150" x2="108" y2="150" stroke="#8a94b0" stroke-width="2"/></g>' +
+    '<g class="roue"><circle cx="220" cy="150" r="30" stroke="#8a94b0" stroke-width="5"/>' +
+    '<line x1="220" y1="122" x2="220" y2="178" stroke="#8a94b0" stroke-width="2"/>' +
+    '<line x1="192" y1="150" x2="248" y2="150" stroke="#8a94b0" stroke-width="2"/></g>' +
+    // cadre
+    '<line x1="80" y1="150" x2="150" y2="80" stroke="#ff7a00" stroke-width="6" stroke-linecap="round"/>' +
+    '<line x1="150" y1="80" x2="220" y2="150" stroke="#ff7a00" stroke-width="6" stroke-linecap="round"/>' +
+    '<line x1="80" y1="150" x2="150" y2="150" stroke="#ff7a00" stroke-width="6"/>' +
+    '<line x1="150" y1="150" x2="150" y2="80" stroke="#ff7a00" stroke-width="4"/>' +
+    '<line x1="150" y1="80" x2="158" y2="64" stroke="#8a94b0" stroke-width="5" stroke-linecap="round"/>' +
+    // cycliste : torse + bras + tete souriante
+    '<line x1="150" y1="80" x2="140" y2="42" stroke="#1c2230" stroke-width="9" stroke-linecap="round"/>' +
+    '<line x1="140" y1="42" x2="162" y2="76" stroke="#1c2230" stroke-width="6" stroke-linecap="round"/>' +
+    '<circle cx="136" cy="30" r="13" fill="#ffd60a"/>' +
+    '<path d="M130 32q6 6 12 0" stroke="#1c2230" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<circle cx="131" cy="27" r="1.8" fill="#1c2230"/><circle cx="141" cy="27" r="1.8" fill="#1c2230"/>' +
+    jambe(150, 150, false) + jambe(150, 150, true) +
+    (mov ? "" : '<text x="228" y="96" font-size="16" fill="#8a94b0">zZ</text>') +
+    '</svg></div>';
+}
+function showCyclist() {
+  if (!liveMode || !liveValid()) return;
+  mediaEl.innerHTML = "";
+  mediaEl.insertAdjacentHTML("beforeend", cyclistSVG());
+}
+// sonde carte<->profil : point tape (trace ou courbe) + heure la plus proche
+function renderLiveProbe() {
+  if (probeEl) { probeEl.remove(); probeEl = null; }
+  if (!liveMode || !liveProbe) return;
+  probeEl = document.createElement("div");
+  probeEl.id = "mkprobe";
+  probeEl.innerHTML = '<div class="h">' + fmtH(liveProbe.t) + '</div><div class="d"></div>';
+  probeEl.style.left = lon2x(liveProbe.lon, zoom) + "px";
+  probeEl.style.top = lat2y(liveProbe.lat, zoom) + "px";
+  world.appendChild(probeEl);
+}
+function probeFromGraph(x) {            // tap sur la courbe alti live
+  if (!prMap || !prMap.blocks.length) return;
+  const b = prMap.blocks[0];
+  const t = (b.t0 + (x - 42) / (prMap.W - 54) * prMap.Vtot) / 1000;
+  let best = null, bd = Infinity;
+  for (const p of livePts) {
+    const d = Math.abs(p.t - t);
+    if (d < bd) { bd = d; best = p; }
+  }
+  if (best) { liveProbe = best; drawProfil(); renderLiveProbe(); }
+}
+mapEl.addEventListener("click", e => {  // tap sur la trace live (carte)
+  if (!liveMode || !livePts.length || Date.now() - lastDrag < 400) return;
+  const mx = e.clientX - mapEl.getBoundingClientRect().left + ox;
+  const my = e.clientY - mapEl.getBoundingClientRect().top + oy;
+  let best = null, bd = Infinity;
+  for (const p of livePts) {
+    const d = Math.hypot(lon2x(p.lon, zoom) - mx, lat2y(p.lat, zoom) - my);
+    if (d < bd) { bd = d; best = p; }
+  }
+  if (best && bd < 24) { liveProbe = best; drawProfil(); renderLiveProbe(); }
+});
 
 // ---------- marqueurs ----------
 function pinSVG(color) {
@@ -771,7 +932,7 @@ function render() {
   ox = lon2x(clon, zoom) - mapEl.clientWidth / 2;
   oy = lat2y(clat, zoom) - (mapEl.clientHeight - profH) / 2;
   world.style.transform = "translate(" + (-ox) + "px," + (-oy) + "px)";
-  renderTiles(); renderTraces(); renderMarkers(); renderLive(); updateKmDay();
+  renderTiles(); renderTraces(); renderMarkers(); renderLive(); renderLiveProbe(); updateKmDay();
   // v5.17 : trace LIVE du jour en pointilles gris, SOUS les cumuls
   if (liveValid() && liveTrace.length) {
     const sg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1318,6 +1479,9 @@ function closeProfil() {
   document.getElementById("prChips").classList.remove("show");
   pan.classList.remove("on");
   document.getElementById("btProfil").classList.remove("on");
+  // v5.22 : fermer l'alti en mode direct (bouton ✕ du panneau) ne
+  // quitte PAS le mode : la fenetre photo revient avec le cycliste.
+  if (liveMode) showCyclist();
 }
 // v5.15.7 : barre du haut FLOTTANTE en 2 fenetres (mode normal et "3
 // fenetres") - apparait 1 s (dur ajustable) a chaque changement de
@@ -1502,7 +1666,15 @@ function drawProfilContent(svg, W, H) {
   // v5.14.1 : journees mises BOUT A BOUT sur un axe virtuel -> les
   // nuits ne creent plus d'espaces vides ; chaque journee occupe une
   // largeur proportionnelle a sa duree reellement tracee.
-  const blocks = [...prDates].sort().map(d => {
+  // v5.22 : en MODE DIRECT, le graphe ne trace QUE la journee live,
+  // construite depuis live_trace.geojson (ele + times de live.py v1.1).
+  const blocks = liveMode
+    ? (livePts.filter(p => p.ele != null).length >= 2
+       ? [{ d: live.date,
+            pts: livePts.filter(p => p.ele != null)
+                        .map(p => [p.t * 1000, p.ele]) }]
+       : [])
+    : [...prDates].sort().map(d => {
     const a = (profilData.dates[d] || []).map(([t, e]) => [t * 1000, e]);
     a.sort((x, y) => x[0] - y[0]);
     return { d: d, pts: a };
@@ -1610,9 +1782,30 @@ function drawProfilContent(svg, W, H) {
                { day: "2-digit", month: "2-digit" }));
     }
   }
+  // v5.22 : MODE DIRECT - curseur "heure active" (orange, gros) a la
+  // position courante + sonde (jaune) au point tape, sur le graphe.
+  if (liveMode) {
+    const cur = (t, col, big) => {
+      const x = X(t * 1000);
+      if (x == null) return;
+      const ln = document.createElementNS(NSVG, "line");
+      ln.setAttribute("x1", x); ln.setAttribute("x2", x);
+      ln.setAttribute("y1", 4); ln.setAttribute("y2", H - 16);
+      ln.setAttribute("stroke", col); ln.setAttribute("stroke-width", "2");
+      ln.setAttribute("stroke-dasharray", "5 4"); svg.appendChild(ln);
+      const tx = document.createElementNS(NSVG, "text");
+      tx.setAttribute("x", Math.min(x + 4, W - 46)); tx.setAttribute("y", big ? 20 : 34);
+      tx.setAttribute("fill", col); tx.setAttribute("font-weight", "700");
+      tx.setAttribute("font-size", big ? "15" : "11");
+      tx.textContent = fmtH(t); svg.appendChild(tx);
+    };
+    if (live && live.t) cur(live.t, "#ff7a00", true);
+    if (liveProbe) cur(liveProbe.t, "#ffd60a", false);
+  }
   profilCursor();
 }
 function profilCursor() {
+  if (liveMode) return;              // v5.22 : en direct, curseurs live/sonde only
   if (!profilOn || !prMap || !media[sel]) return;
   const svg = document.getElementById("prSvg");
   svg.querySelectorAll(".prCur").forEach(x => x.remove());
@@ -1662,6 +1855,13 @@ function profilCursor() {
   tx.textContent = Math.round(e) + "m"; svg.appendChild(tx);
 }
 document.getElementById("prSvg").addEventListener("click", e => {
+  // v5.22 : en mode direct, le clic sur la courbe = SONDE (heure la
+  // plus proche + pointeur sur la carte), pas d'ouverture de photo.
+  if (liveMode) {
+    const r = e.currentTarget.getBoundingClientRect();
+    probeFromGraph(e.clientX - r.left);
+    return;
+  }
   // clic inverse : ouvrir la photo la plus proche de l'horodatage clique
   // v5.14.1 : px -> position sur l'axe virtuel contigu -> journee + heure
   if (!prMap) return;
