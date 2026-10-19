@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.1 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.2 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.2 = BOUTON DIRECT AUTO-OFF : retour terrain du 19/10 -
+     apres le toggle OFF (purge de live.json cote depot), le bouton
+     Direct ne disparaissait qu au REFRESH MANUEL. Cause : le catch
+     du pollLive ne remettait pas "live" a zero - la derniere
+     position restait valide (< 30 min) en memoire. Desormais, un
+     live.json introuvable (404) coupe TOUT au poll suivant (<= 30 s)
+     sans refresh.
      v5.24.1 = retours terrain du 19/10 : (1) barre du haut : 8 s
      AUSSI au rafraichissement - le barFlash(1500) d openProfil
      (lance au chargement mobile) ANNULAIT le timer de 8 s du boot ;
@@ -852,7 +859,14 @@ async function pollLive() {
       }
     } else { renderLive(); }
     updLiveBtn();                       // v5.22 : bouton/clignotement/exit auto
-  } catch (e) { /* live.json absent (feature OFF ou jamais poussee) */
+  } catch (e) { /* live.json absent (feature OFF ou purge du toggle) :
+      v5.24.2 : REMETTRE A ZERO - avant, la derniere position restait
+      en memoire et liveValid() restait vrai jusqu'a 30 min : le
+      bouton Direct ne disparaissait qu'au refresh manuel. Desormais
+      le bouton disparaît au poll suivant (<= 30 s). */
+    if (live) {
+      live = null; liveTrace = []; parseLivePts(); render();
+    }
     updLiveBtn(); }
 }
 
