@@ -1,6 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.0 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.1 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.1 = retours terrain du 19/10 : (1) barre du haut : 8 s
+     AUSSI au rafraichissement - le barFlash(1500) d openProfil
+     (lance au chargement mobile) ANNULAIT le timer de 8 s du boot ;
+     il ne flash plus que si la barre n est pas deja affichee.
+     (2) BADGE FIABILITE ALTI : au DEBUT de la section (gauche,
+     plus jamais au centre - masque par la poignee) ; "gpslogger"
+     en ENTIER ROUGE NON BARRE (seule la forme courte "g" est
+     barree) ; "mixte"/"m" en ORANGE #e8a04c (plus de vert).
      v5.24.0 = (1) bouton Direct : VERT CLIGNOTANT des l apparition
      (mouvement percu) et JUSQU AU PREMIER CLIC - ensuite plus
      jamais de clignotement (clic 1 : orange en mode direct ; clic
@@ -1569,7 +1577,11 @@ async function openProfil() {
       && !wrapEl.classList.contains("alti")) {
     if (MOBILE) {
       wrapEl.classList.add("p3");   // "3 fenetres" smartphone
-      barFlash(1500);                // v5.15.6 : barre flash 1,5 s a l'ouverture
+      // v5.24.1 : le flash 1,5 s d openProfil (appele AU CHARGEMENT
+      // mobile) ANNULAIT le timer de 8 s du boot -> barre courte au
+      // rafraichissement. On ne flash que si la barre n est pas
+      // deja affichee (ouverture manuelle de l alti plus tard).
+      if (!wrapEl.classList.contains("baron")) barFlash(1500);
       centerActive();                // v5.16 : carte centree sur la photo affichee
     }
     // laptop : overlay simple, aucune classe supplementaire
@@ -1863,35 +1875,40 @@ function drawProfilContent(svg, W, H) {
     pl.setAttribute("points", dp); pl.setAttribute("fill", "none");
     pl.setAttribute("stroke", prColor(b.d)); pl.setAttribute("stroke-width", "2");
     svg.appendChild(pl);
-    // v5.24 : BADGE FIABILITE ALTI au-dessus de la section journalnee.
+    // v5.24.1 : BADGE FIABILITE ALTI au DEBUT (gauche) de la section
+    // journalnee - le CENTRE etait masque par la poignee ⌄.
     // srcData[d] (profil.json "src", build_daily v5.2.28) = part de
-    // DISTANCE garmin (0..1). > 85 % -> "garmin" ; < 15 % -> gpslogger
-    // (BARRé, moins precis) ; sinon "mixte". Forme courte (g/m) si
-    // plus de 3 journees affichees, mot entier sinon.
+    // DISTANCE garmin (0..1). >= 85 % -> "garmin" VERT ; <= 15 % ->
+    // "gpslogger" ROUGE NON BARRE (seule la forme courte "g" est
+    // barree) ; sinon "mixte" ORANGE. Forme courte (g/m) si plus
+    // de 3 journees affichees, mot entier sinon.
     if (!liveMode && srcData) {
       const frac = srcData[b.d];
       if (frac != null) {
         const plein = blocks.length <= 3;
-        let txt, strike = false;
-        if (frac >= 0.85) txt = plein ? "garmin" : "g";
-        else if (frac <= 0.15) { txt = plein ? "gpslogger" : "g"; strike = true; }
-        else txt = plein ? "mixte" : "m";
+        let txt, col, strike = false;
+        if (frac >= 0.85) { txt = plein ? "garmin" : "g"; col = "#9fd6a0"; }
+        else if (frac <= 0.15) {
+          txt = plein ? "gpslogger" : "g"; col = "#e07b7b";
+          strike = !plein;             // v5.24.1 : mot entier NON barre
+        }
+        else { txt = plein ? "mixte" : "m"; col = "#e8a04c"; }   // orange
         const x0 = X(b.t0), x1 = X(b.t1);
         if (x0 != null && x1 != null) {
-          const bx = (x0 + x1) / 2;
+          const bx = x0 + 4;           // v5.24.1 : DEBUT de section
           const bt = document.createElementNS(NSVG, "text");
           bt.setAttribute("x", bx); bt.setAttribute("y", 12);
-          bt.setAttribute("text-anchor", "middle");
+          bt.setAttribute("text-anchor", "start");
           bt.setAttribute("font-size", plein ? "10" : "11");
           bt.setAttribute("font-weight", "700");
-          bt.setAttribute("fill", strike ? "#e07b7b" : "#9fd6a0");
+          bt.setAttribute("fill", col);
           bt.textContent = txt; svg.appendChild(bt);
-          if (strike) {                 // barre le mot (g ou gpslogger)
+          if (strike) {                 // barre le "g" court (gpslogger)
             const bl = document.createElementNS(NSVG, "line");
             const w = bt.getComputedTextLength ? bt.getComputedTextLength() : 30;
-            bl.setAttribute("x1", bx - w / 2 - 1); bl.setAttribute("x2", bx + w / 2 + 1);
+            bl.setAttribute("x1", bx - 1); bl.setAttribute("x2", bx + w + 1);
             bl.setAttribute("y1", 9); bl.setAttribute("y2", 9);
-            bl.setAttribute("stroke", "#e07b7b"); bl.setAttribute("stroke-width", "1.2");
+            bl.setAttribute("stroke", col); bl.setAttribute("stroke-width", "1.2");
             svg.appendChild(bl);
           }
         }
