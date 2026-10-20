@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.4 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.5 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.5 = EXTENSIONS RETABLIES : le geojson porte name SANS
+     extension (build_daily rsplit '.') - l'url relative construite en
+     v5.24.4 donnait photos/<date>/<nom-sans-.jpg> -> 404 -> fenetre
+     photo noire. Extension .jpg/.mp4 retablie selon le type ; cle de
+     commentaires = nom sans extension des deux cotes.
      v5.24.4 = URLS MEDIA RELATIVES : les marqueurs geojson portent une
      url ABSOLUE github.io (build_daily/SHARE_URL) -> les photos se
      chargeaient en direct depuis GitHub (clic-droit : URL du repo ;
@@ -1392,10 +1397,11 @@ async function loadComments() {
     if (iUrl < 0 || iCmt < 0) return;
     for (const l of lines.slice(1)) {
       const f = parseCSVLine(l);
-      // v5.24.4 : cle date/nom (l'URL du CSV peut rester absolue dans
-      // le depot - l'appariement ne depend plus de son format)
+      // v5.24.5 : le CSV porte nom AVEC extension, le geojson SANS ->
+      // cle = nom sans extension (replace), sinon appariement raté.
       if (f.length >= head.length && f[iCmt])
-        cmtByUrl[f[iDate] + "/" + f[iNom]] = f[iCmt];
+        cmtByUrl[f[iDate] + "/" +
+                 f[iNom].replace(/\.(jpg|jpeg|mp4)$/i, "")] = f[iCmt];
     }
     // appliquer aux medias deja charges et rafraichir l'affichage
     let changed = false;
@@ -1442,7 +1448,8 @@ document.getElementById("admSave").onclick = async () => {
     let hit = false;
     for (let i = 1; i < lines.length; i++) {
       const f = parseCSVLine(lines[i]);
-      if (f[iDate2] === m.date && f[iNom2] === m.name) {
+      if (f[iDate2] === m.date &&
+          f[iNom2].replace(/\.(jpg|jpeg|mp4)$/i, "") === m.name) {
         // re-encoder la ligne avec le commentaire cite s'il contient virgules/quotes
         f[iCmt] = txt; hit = true;
         lines[i] = f.map(x => /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x).join(",");
@@ -2267,11 +2274,11 @@ async function load() {
         const p = ft.properties || {};
         media.push({
           type, name: p.name || "", date: p.date || "", commentaire: p.commentaire || "",
-          // v5.24.4 : URL RELATIVE reconstruite depuis date+nom - JAMAIS
-          // p.url (URL absolue github.io ecrite par build_daily : elle
-          // affichait les photos en direct depuis GitHub, contournant le
-          // portail/filtrage et revelant le repo dans le clic-droit).
-          url: BASE + "/photos/" + (p.date || "") + "/" + (p.name || ""),
+          // v5.24.5 : le geojson porte name SANS EXTENSION (build_daily
+          // rsplit '.' - v5.24.4 oubliait .jpg/.mp4 -> 404 -> cadre noir,
+          // retour 21/10). Extension retablie selon le type du media.
+          url: BASE + "/photos/" + (p.date || "") + "/" + (p.name || "")
+               + (type === "video" ? ".mp4" : ".jpg"),
           lon: ft.geometry.coordinates[0], lat: ft.geometry.coordinates[1],
           color: ((p._umap_options || p._storage_options || {}).color) || "#3388ff"
         });
