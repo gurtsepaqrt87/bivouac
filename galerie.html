@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.2 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.3 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.3 = BASE RELATIF : la galerie chargeait ses donnees (photos.csv,
+     geojson, live, profil.json) via une URL ABSOLUE github.io (const BASE),
+     contournant le portail d'authentification (fenetres de dates sans
+     effet) et exposant l'URL GitHub dans le source de la page. Desormais
+     BASE = "." : meme comportement en acces direct, et les donnees passent
+     par l'origine servie (portail -> gateway -> filtrage actif).
      v5.24.2 = BOUTON DIRECT AUTO-OFF : retour terrain du 19/10 -
      apres le toggle OFF (purge de live.json cote depot), le bouton
      Direct ne disparaissait qu au REFRESH MANUEL. Cause : le catch
@@ -576,8 +582,14 @@
 <div id="err"></div>
 <script>
 "use strict";
-// --- Seule ligne a adapter : l'URL GitHub Pages du projet ---
-const BASE = "https://gurtsepaqrt87.github.io/gkr63x-g84zwo";
+// --- v5.24.3 : BASE RELATIF "." (retour portail 21/10). Avant : URL
+// absolue github.io -> les donnees (photos.csv, geojson, live, profil)
+// chargees DIRECTEMENT depuis GitHub, contournant tout portail/proxy
+// (fenetres de dates inoperantes) ET revelant l'URL GitHub dans le
+// source. Relatif "." : sur github.io, resolu en meme-origine (comportement
+// inchange) ; via un portail/proxy, resolu vers le portail -> filtrage
+// effectif. NE PAS remettre d'URL absolue.
+const BASE = ".";
 // --- 2e ligne a adapter (mode admin) : le depot GitHub "user/projet".
 // NB : non deduisible de BASE (sur user.github.io/projet, l'user est
 // dans le sous-domaine, pas dans le chemin) - d'ou cette constante.
