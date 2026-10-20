@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.3 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.4 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.4 = URLS MEDIA RELATIVES : les marqueurs geojson portent une
+     url ABSOLUE github.io (build_daily/SHARE_URL) -> les photos se
+     chargeaient en direct depuis GitHub (clic-droit : URL du repo ;
+     portail contourne aussi pour les images). La galerie reconstruit
+     desormais l'url depuis date+nom (BASE relatif) et l'appariement
+     des commentaires se fait sur date|nom (independant du format de
+     la colonne url du CSV).
      v5.24.3 = BASE RELATIF : la galerie chargeait ses donnees (photos.csv,
      geojson, live, profil.json) via une URL ABSOLUE github.io (const BASE),
      contournant le portail d'authentification (fenetres de dates sans
@@ -1385,12 +1392,15 @@ async function loadComments() {
     if (iUrl < 0 || iCmt < 0) return;
     for (const l of lines.slice(1)) {
       const f = parseCSVLine(l);
-      if (f.length >= head.length && f[iCmt]) cmtByUrl[f[iUrl]] = f[iCmt];
+      // v5.24.4 : cle date/nom (l'URL du CSV peut rester absolue dans
+      // le depot - l'appariement ne depend plus de son format)
+      if (f.length >= head.length && f[iCmt])
+        cmtByUrl[f[iDate] + "/" + f[iNom]] = f[iCmt];
     }
     // appliquer aux medias deja charges et rafraichir l'affichage
     let changed = false;
     for (const m of media) {
-      const c = cmtByUrl[m.url];
+      const c = cmtByUrl[m.date + "/" + m.name];
       if (c && c !== m.commentaire) { m.commentaire = c; changed = true; }
     }
     if (changed && sel >= 0) {
@@ -1425,13 +1435,14 @@ document.getElementById("admSave").onclick = async () => {
     const lines = new TextDecoder().decode(
       Uint8Array.from(atob(meta.content.replace(/\n/g, "")), c => c.charCodeAt(0)))
       .split(/\r?\n/).filter(Boolean);
-    // 2. mettre a jour la ligne du media (cle : url)
+    // 2. mettre a jour la ligne du media (cle : date|nom - v5.24.4)
     const head = parseCSVLine(lines[0]);
     const iUrl = head.indexOf("url"), iCmt = head.indexOf("commentaire");
+    const iDate2 = head.indexOf("date"), iNom2 = head.indexOf("nom");
     let hit = false;
     for (let i = 1; i < lines.length; i++) {
       const f = parseCSVLine(lines[i]);
-      if (f[iUrl] === m.url) {
+      if (f[iDate2] === m.date && f[iNom2] === m.name) {
         // re-encoder la ligne avec le commentaire cite s'il contient virgules/quotes
         f[iCmt] = txt; hit = true;
         lines[i] = f.map(x => /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x).join(",");
@@ -1449,7 +1460,7 @@ document.getElementById("admSave").onclick = async () => {
         content: b64, sha: meta.sha })
     });
     if (!p.ok) throw new Error("commit : HTTP " + p.status);
-    m.commentaire = txt; cmtByUrl[m.url] = txt;
+    m.commentaire = txt; cmtByUrl[m.date + "/" + m.name] = txt;
     const c = document.getElementById("cmt");
     c.textContent = txt; c.classList.toggle("on", !!txt);
     btn.textContent = "✔ Enregistré";
@@ -2256,7 +2267,12 @@ async function load() {
         const p = ft.properties || {};
         media.push({
           type, name: p.name || "", date: p.date || "", commentaire: p.commentaire || "",
-          url: p.url || "", lon: ft.geometry.coordinates[0], lat: ft.geometry.coordinates[1],
+          // v5.24.4 : URL RELATIVE reconstruite depuis date+nom - JAMAIS
+          // p.url (URL absolue github.io ecrite par build_daily : elle
+          // affichait les photos en direct depuis GitHub, contournant le
+          // portail/filtrage et revelant le repo dans le clic-droit).
+          url: BASE + "/photos/" + (p.date || "") + "/" + (p.name || ""),
+          lon: ft.geometry.coordinates[0], lat: ft.geometry.coordinates[1],
           color: ((p._umap_options || p._storage_options || {}).color) || "#3388ff"
         });
       }
