@@ -91883,4 +91883,4 @@
         <ele>45</ele>
         <time>2026-10-19T15:42:53.000Z</time>
         
-      </trkpt></trkseg></trk></gpx>
+      </trkpt><trkpt lat="48.1023812" lon="-1.662384"><ele>94.4000015258789</ele><time>2026-10-20T11:01:39.300Z</time><src>network</src></trkpt><trkpt lat="48.1023878" lon="-1.6623812"><ele>98.0</ele><time>2026-10-20T20:20:25.009Z</time><src>network</src></trkpt><trkpt lat="48.1023716" lon="-1.6623669"><ele>93.30000305175781</ele><time>2026-10-20T20:21:28.668Z</time><src>network</src></trkpt><trkpt lat="48.1023844" lon="-1.6623818"><ele>94.4000015258789</ele><time>2026-10-20T20:22:32.452Z</time><src>network</src></trkpt><trkpt lat="48.1023859" lon="-1.662379"><ele>98.0</ele><time>2026-10-20T20:23:36.180Z</time><src>network</src></trkpt><trkpt lat="48.1023482" lon="-1.6623428"><ele>93.30000305175781</ele><time>2026-10-20T20:24:39.858Z</time><src>network</src></trkpt><trkpt lat="48.1023778" lon="-1.6623746"><ele>98.0</ele><time>2026-10-20T20:25:43.473Z</time><src>network</src></trkpt></trkseg></trk></gpx>
