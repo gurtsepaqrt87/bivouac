@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.8 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.9 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.9 = MODE CLASSIQUE, HEURE DU POINT PHOTO (retour 21/10) :
+     (1) CARTE : pastille HEURE noire/blanche a cote du marqueur de
+     la photo active (meme style que la sonde live v5.24.8), suit le
+     marqueur au zoom/deplacement, absente en mode direct ;
+     (2) GRAPHE ALTI : curseur vertical + point + etiquette JAUNES
+     (#ffd60a, etait orange - plus visible sur fond noir), et
+     etiquette "HH:MM  Altim" (heure AJOUTEE a l'altitude).
      v5.24.8 = FINITIONS LIVE (retour 21/10) : (1) onde de pulsation
      de la pastille live VERTE (l'ombre restait orange historique) ;
      (2) heure de la sonde sur la CARTE en NOIR sur pastille blanche
@@ -322,6 +329,10 @@
   .mk .icon{display:block;transition:transform .18s ease;transform-origin:50% 100%;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
   .mk.sel .icon{transform:scale(1.65);filter:drop-shadow(0 0 0 #fff) drop-shadow(0 0 6px #fff) drop-shadow(0 2px 3px rgba(0,0,0,.6))}
   .mk.sel{z-index:500}
+  /* v5.24.9 : pastille HEURE du marqueur photo ACTIF (mode classique)
+     - meme style que l'heure de la sonde live (noir sur blanc, v5.24.8).
+     Positionnee a cote du pin par applySel(), purgee a chaque rendu. */
+  .mkhour{position:absolute;z-index:550;font-size:11px;font-weight:700;color:#000;background:#fff;border-radius:6px;padding:2px 5px;box-shadow:0 1px 3px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap;line-height:1.4}
   /* --- contrôles --- */
   #zoom{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:8px;z-index:1000}
     #zoom button{width:52px;height:52px;font-size:26px;font-weight:700;border-radius:12px;border:2px solid #b35300;background:#ff7a00;color:#fff;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
@@ -670,6 +681,7 @@ const errEl = document.getElementById("err");
 let zoom = 11, clon = -1.85, clat = 48.15;   // centre initial (cadrage auto ensuite)
 let ox = 0, oy = 0;
 let media = [], marks = [], traces = [];
+let mkHourEl = null;   // v5.24.9 : pastille heure du marqueur actif
 // v5.17 : live (position gpslogger du jour, poussee par live.py)
 let live = null, liveTrace = [], liveEl = null, liveSeen = false;   // v5.24 : liveSeen = 1er clic sur le bouton Direct
 // v5.17.1 : km par journee (profil.json "km", charge au boot)
@@ -1107,6 +1119,22 @@ function renderMarkers() {
 }
 function applySel() {
   marks.forEach(m => m.el.classList.toggle("sel", m.i === sel));
+  // v5.24.9 : HEURE de la photo ACTIVE en pastille noire/blanche a
+  // cote du marqueur (meme style que la sonde live). Reconstruite a
+  // chaque applySel (appele par renderMarkers a CHAQUE rendu -> suit
+  // le marqueur au zoom/deplacement). Pas de badge en mode direct.
+  if (mkHourEl) { mkHourEl.remove(); mkHourEl = null; }
+  if (liveMode) return;
+  const mk = marks.find(m => m.i === sel);
+  const t = media[sel] ? photoEpoch(media[sel]) : null;
+  if (mk && t != null) {
+    mkHourEl = document.createElement("div");
+    mkHourEl.className = "mkhour";
+    mkHourEl.textContent = fmtH(t / 1000);   // photoEpoch = ms
+    mkHourEl.style.left = (parseFloat(mk.el.style.left) + 14) + "px";
+    mkHourEl.style.top = (parseFloat(mk.el.style.top) - 34) + "px";
+    world.appendChild(mkHourEl);
+  }
 }
 
 // ---------- rendu ----------
@@ -2125,20 +2153,24 @@ function profilCursor() {
   ln.setAttribute("class", "prCur");
   ln.setAttribute("x1", x); ln.setAttribute("x2", x);
   ln.setAttribute("y1", 4); ln.setAttribute("y2", prMap.Y(prMap.emin));
-  ln.setAttribute("stroke", "#ff7a00"); ln.setAttribute("stroke-width", "2");
+  // v5.24.9 : curseur photo JAUNE (#ffd60a, comme la sonde live - plus
+  // visible sur fond noir que l'orange #ff7a00) + heure AJOUTEE a
+  // l'altitude dans l'etiquette.
+  ln.setAttribute("stroke", "#ffd60a"); ln.setAttribute("stroke-width", "2");
   svg.appendChild(ln);
   const dot = document.createElementNS(NSVG, "circle");
   dot.setAttribute("class", "prCur");
   dot.setAttribute("cx", x); dot.setAttribute("cy", prMap.Y(e));
-  dot.setAttribute("r", 5); dot.setAttribute("fill", "#ff7a00");
+  dot.setAttribute("r", 5); dot.setAttribute("fill", "#ffd60a");
   svg.appendChild(dot);
   const tx = document.createElementNS(NSVG, "text");
   tx.setAttribute("class", "prCur");
-  tx.setAttribute("x", Math.min(x + 6, svg.clientWidth - 46));
+  tx.setAttribute("x", Math.min(x + 6, svg.clientWidth - 78));
   tx.setAttribute("y", prMap.Y(e) - 8);
-  tx.setAttribute("fill", "#ffb066"); tx.setAttribute("font-size", "12");
+  tx.setAttribute("fill", "#ffd60a"); tx.setAttribute("font-size", "12");
   tx.setAttribute("font-weight", "700");
-  tx.textContent = Math.round(e) + "m"; svg.appendChild(tx);
+  tx.textContent = fmtH(tc / 1000) + "  " + Math.round(e) + "m";
+  svg.appendChild(tx);
 }
 document.getElementById("prSvg").addEventListener("click", e => {
   // v5.22 : en mode direct, le clic sur la courbe = SONDE (heure la
