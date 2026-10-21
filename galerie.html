@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.12 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.13 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.13 = FIX TAILLE BADGES (retour 21/10) : le critere v5.24.12
+     testait la classe "alti" (= 1F/2F alti) au lieu de "p3" (= 3F
+     mobile) -> 3F etait agrandi et 2F non, l'inverse du but. Desormais
+     14 px partout SAUF 3F (taille d'origine) ; live inchange (14 px).
      v5.24.12 = BADGES FIABILITE AGRANDIS (retour 21/10) : classique
      1F/2F -> garmin/gpslogger/mixte en 14 px (3F inchange : panneau
      bas) ; live/direct -> gpslogger en 14 px ; barre du "g" court
@@ -2037,10 +2041,11 @@ function drawProfilContent(svg, W, H) {
       if (frac != null) {
         const plein = blocks.length <= 3;
         let txt, col, strike = false;
-        // v5.24.12 : badge plus GROS en 1F/2F (panneau alti haut,
-        // place disponible - retour 21/10) ; taille d'origine
-        // conservee en 3F (panneau bas et etroit).
-        const fsBadge = !wrapEl.classList.contains("alti")
+        // v5.24.13 : CORRECTION du critere - le 3F mobile est la classe
+        // p3 (la classe alti = 1F/2F alti, d'ou l'inversion observee
+        // en v5.24.12 : 3F agrandi, 2F non). On agrandit donc en 1F
+        // ET 2F (pas de p3), on garde la taille d'origine en 3F.
+        const fsBadge = !wrapEl.classList.contains("p3")
                         ? 14 : (plein ? 10 : 11);
         if (frac >= 0.85) { txt = plein ? "garmin" : "g"; col = "#9fd6a0"; }
         else if (frac <= 0.15) {
