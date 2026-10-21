@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.9 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.10 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.10 = etiquette heure+altitude du curseur alti DEPLACEE SOUS
+     le point (retour 21/10 : masquee par la poignee orange en haut
+     quand le point vit en haut de courbe) - repli au-dessus si le bas
+     de la fenetre manque de place.
      v5.24.9 = MODE CLASSIQUE, HEURE DU POINT PHOTO (retour 21/10) :
      (1) CARTE : pastille HEURE noire/blanche a cote du marqueur de
      la photo active (meme style que la sonde live v5.24.8), suit le
@@ -2166,7 +2170,13 @@ function profilCursor() {
   const tx = document.createElementNS(NSVG, "text");
   tx.setAttribute("class", "prCur");
   tx.setAttribute("x", Math.min(x + 6, svg.clientWidth - 78));
-  tx.setAttribute("y", prMap.Y(e) - 8);
+  // v5.24.10 : etiquette SOUS le point (Y(e)+16) - au-dessus elle
+  // etait masquee par la poignee orange ⌄ centree en haut quand le
+  // point vit en haut de courbe (retour 21/10). Repli AU-DESSUS si
+  // le bas de la fenetre manquerait de place (points bas de courbe).
+  const yBas = prMap.Y(e) + 16, yHaut = prMap.Y(e) - 8;
+  const yMax = svg.clientHeight - 8;
+  tx.setAttribute("y", yBas > yMax ? yHaut : yBas);
   tx.setAttribute("fill", "#ffd60a"); tx.setAttribute("font-size", "12");
   tx.setAttribute("font-weight", "700");
   tx.textContent = fmtH(tc / 1000) + "  " + Math.round(e) + "m";
