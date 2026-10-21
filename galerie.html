@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.11 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.12 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.12 = BADGES FIABILITE AGRANDIS (retour 21/10) : classique
+     1F/2F -> garmin/gpslogger/mixte en 14 px (3F inchange : panneau
+     bas) ; live/direct -> gpslogger en 14 px ; barre du "g" court
+     recalee sur la taille.
      v5.24.11 = BADGE FIABILITE EN MODE DIRECT (retour 21/10) : la
      fenetre alti live affiche "gpslogger" en ROUGE au debut de la
      courbe (source unique gpslogger, altimetrie GPS non barometrique
@@ -2021,7 +2025,9 @@ function drawProfilContent(svg, W, H) {
         const btl = document.createElementNS(NSVG, "text");
         btl.setAttribute("x", x0l + 4); btl.setAttribute("y", 12);
         btl.setAttribute("text-anchor", "start");
-        btl.setAttribute("font-size", "10");
+        // v5.24.12 : badge live aussi agrandi (14 px, comme le
+        // classique en 1F/2F - retour 21/10).
+        btl.setAttribute("font-size", "14");
         btl.setAttribute("font-weight", "700");
         btl.setAttribute("fill", "#e07b7b");
         btl.textContent = "gpslogger"; svg.appendChild(btl);
@@ -2031,6 +2037,11 @@ function drawProfilContent(svg, W, H) {
       if (frac != null) {
         const plein = blocks.length <= 3;
         let txt, col, strike = false;
+        // v5.24.12 : badge plus GROS en 1F/2F (panneau alti haut,
+        // place disponible - retour 21/10) ; taille d'origine
+        // conservee en 3F (panneau bas et etroit).
+        const fsBadge = !wrapEl.classList.contains("alti")
+                        ? 14 : (plein ? 10 : 11);
         if (frac >= 0.85) { txt = plein ? "garmin" : "g"; col = "#9fd6a0"; }
         else if (frac <= 0.15) {
           txt = plein ? "gpslogger" : "g"; col = "#e07b7b";
@@ -2043,15 +2054,17 @@ function drawProfilContent(svg, W, H) {
           const bt = document.createElementNS(NSVG, "text");
           bt.setAttribute("x", bx); bt.setAttribute("y", 12);
           bt.setAttribute("text-anchor", "start");
-          bt.setAttribute("font-size", plein ? "10" : "11");
+          bt.setAttribute("font-size", fsBadge);
           bt.setAttribute("font-weight", "700");
           bt.setAttribute("fill", col);
           bt.textContent = txt; svg.appendChild(bt);
           if (strike) {                 // barre le "g" court (gpslogger)
             const bl = document.createElementNS(NSVG, "line");
             const w = bt.getComputedTextLength ? bt.getComputedTextLength() : 30;
+            // v5.24.12 : hauteur de barre adaptee a la taille du badge
+            const by = Math.round(12 - fsBadge * 0.3);
             bl.setAttribute("x1", bx - 1); bl.setAttribute("x2", bx + w + 1);
-            bl.setAttribute("y1", 9); bl.setAttribute("y2", 9);
+            bl.setAttribute("y1", by); bl.setAttribute("y2", by);
             bl.setAttribute("stroke", col); bl.setAttribute("stroke-width", "1.2");
             svg.appendChild(bl);
           }
