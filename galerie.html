@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.7 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.8 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.8 = FINITIONS LIVE (retour 21/10) : (1) onde de pulsation
+     de la pastille live VERTE (l'ombre restait orange historique) ;
+     (2) heure de la sonde sur la CARTE en NOIR sur pastille blanche
+     (etait jaune, peu visible) - la sonde du GRAPHE ALTI garde son
+     jaune sur fond noir (inchangee).
      v5.24.7 = PASTILLE LIVE VERTE (retour 21/10) : le curseur de
      position live sur la CARTE (.mklive) passe du rouge (#e63946,
      v5.23.1) au VERT #2ecc71 en mouvement actif ; gris immuable en
@@ -309,7 +314,10 @@
      (regle .pause inchangee). */
   .mklive{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#2ecc71;border:2.5px solid #fff;animation:livepulse 2s infinite;pointer-events:none;z-index:5}
   .mklive.pause{background:#8a8f98;animation:none}
-  @keyframes livepulse{0%{box-shadow:0 0 0 0 rgba(255,122,0,.7)}70%{box-shadow:0 0 0 16px rgba(255,122,0,0)}100%{box-shadow:0 0 0 0 rgba(255,122,0,0)}}
+  /* v5.24.8 : ONDE DE PULSATION VERTE - l'ombre animee restait
+     ORANGE rgba(255,122,0) (couleur historique du curseur) alors que
+     la pastille est verte depuis la v5.24.7 (retour 21/10). */
+  @keyframes livepulse{0%{box-shadow:0 0 0 0 rgba(46,204,113,.7)}70%{box-shadow:0 0 0 16px rgba(46,204,113,0)}100%{box-shadow:0 0 0 0 rgba(46,204,113,0)}}
   .mk{position:absolute;transform:translate(-50%,-100%);cursor:pointer;line-height:0}
   .mk .icon{display:block;transition:transform .18s ease;transform-origin:50% 100%;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
   .mk.sel .icon{transform:scale(1.65);filter:drop-shadow(0 0 0 #fff) drop-shadow(0 0 6px #fff) drop-shadow(0 2px 3px rgba(0,0,0,.6))}
@@ -358,7 +366,11 @@
   /* v5.22 : sonde live (point tape sur la trace/courbe) + cycliste */
   #mkprobe{position:absolute;z-index:600;transform:translate(-50%,-100%);text-align:center;line-height:1}
   #mkprobe .d{width:12px;height:12px;border-radius:50%;background:#ffd60a;border:2px solid #fff;margin:0 auto;box-shadow:0 1px 3px rgba(0,0,0,.5)}
-  #mkprobe .h{font-size:11px;font-weight:700;color:#ffd60a;text-shadow:0 1px 2px #000;padding:2px 4px}
+  /* v5.24.8 : heure de la sonde NOIRE sur la carte (etait jaune
+     #ffd60a, peu visible - retour 21/10). Liseret blanc pour rester
+     lisible sur les zones sombres de la carte. NB : la SONDE du
+     GRAPHE ALTI garde son jaune (fond noir -> parfait, inchange). */
+  #mkprobe .h{font-size:11px;font-weight:700;color:#000;background:#fff;border-radius:6px;padding:2px 5px;box-shadow:0 1px 3px rgba(0,0,0,.5)}
   #cyc{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#0d1117}
   #cyc svg{width:min(72%,320px);height:auto}
   #cyc .roue{transform-origin:center;transform-box:fill-box}
