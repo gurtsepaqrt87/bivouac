@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.10 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.11 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.11 = BADGE FIABILITE EN MODE DIRECT (retour 21/10) : la
+     fenetre alti live affiche "gpslogger" en ROUGE au debut de la
+     courbe (source unique gpslogger, altimetrie GPS non barometrique
+     -> avertissement systematique ; le mode classique garde son
+     badge garmin/gpslogger/mixte selon srcData).
      v5.24.10 = etiquette heure+altitude du curseur alti DEPLACEE SOUS
      le point (retour 21/10 : masquee par la poignee orange en haut
      quand le point vit en haut de courbe) - repli au-dessus si le bas
@@ -2003,7 +2008,25 @@ function drawProfilContent(svg, W, H) {
     // "gpslogger" ROUGE NON BARRE (seule la forme courte "g" est
     // barree) ; sinon "mixte" ORANGE. Forme courte (g/m) si plus
     // de 3 journees affichees, mot entier sinon.
-    if (!liveMode && srcData) {
+    // v5.24.11 : en MODE DIRECT, la courbe est TOUJOURS construite
+    // depuis live_trace.geojson (source gpslogger, largement moins
+    // precise que le barometre garmin) -> badge ROUGE affiche d'office
+    // pour avertir de la faible fiabilite altimetrique du live.
+    if (liveMode) {
+      // v5.24.11 : badge GPSLOGGER ROUGE au debut de la courbe live
+      // (source unique = live_trace.geojson, altimetrie GPS non
+      // barometrique -> faible fiabilite, avertissement d'office).
+      const x0l = X(b.t0);
+      if (x0l != null) {
+        const btl = document.createElementNS(NSVG, "text");
+        btl.setAttribute("x", x0l + 4); btl.setAttribute("y", 12);
+        btl.setAttribute("text-anchor", "start");
+        btl.setAttribute("font-size", "10");
+        btl.setAttribute("font-weight", "700");
+        btl.setAttribute("fill", "#e07b7b");
+        btl.textContent = "gpslogger"; svg.appendChild(btl);
+      }
+    } else if (srcData) {
       const frac = srcData[b.d];
       if (frac != null) {
         const plein = blocks.length <= 3;
