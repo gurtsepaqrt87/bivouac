@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.5 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.6 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.6 = MODE DIRECT, RETOUCHES VISUELLES (retour 21/10) :
+     (1) trace live : pointille ALTERNE rouge-vide-vert-vide (2
+     polylines superposees, le vert decale d'un demi-periode tombe
+     dans les vides du rouge ; tirets toujours a l'echelle du zoom) ;
+     (2) curseur live du graphe alti : VERT en mouvement actif
+     (< 10 min du dernier point), GRIS en inactivite (etait orange).
      v5.24.5 = EXTENSIONS RETABLIES : le geojson porte name SANS
      extension (build_daily rsplit '.') - l'url relative construite en
      v5.24.4 donnait photos/<date>/<nom-sans-.jpg> -> 404 -> fenetre
@@ -1122,17 +1128,34 @@ function render() {
       p.setAttribute("points", t.geometry.coordinates
         .map(c => (lon2x(c[0], zoom) - ox) + "," + (lat2y(c[1], zoom) - oy)).join(" "));
       p.setAttribute("fill", "none");
-      // v5.23.1 : ROUGE vif (#e63946) pour la visibilite (etait orange).
-      p.setAttribute("stroke", "#e63946");
-      p.setAttribute("stroke-width", 5);
+      // v5.24.6 : POINTILLE ALTERNE rouge-vide-vert-vide (retour 21/10 :
+      // le rouge integral etait peu lisible / trop agressif). Un seul
+      // polyline ne peut porter deux couleurs : on superpose 2 traces
+      // de MEME dasharray sur une periode 2(d+g) - le vert, decalle de
+      // d+g (stroke-dashoffset), tombe exactement dans les vides du
+      // rouge. (v5.23.1 : le rouge #e63946 remontait au v5.22.2.)
+      const dash = Math.max(6, Math.round(7 * Math.pow(2, zoom - 14)));
+      const gap = Math.round(dash * 0.85);
       // v5.22.6 : TIRETS ECHELLES SUR LE ZOOM - dasharray en pixels
       // ecran, les tirets se serraient au dezoom jusqu a fusionner
       // en ligne continue. Espacement ~doublable par niveau de zoom.
-      const dash = Math.max(6, Math.round(7 * Math.pow(2, zoom - 14)));
-      p.setAttribute("stroke-dasharray", dash + " " + Math.round(dash * 0.85));
+      p.setAttribute("stroke", "#e63946");
+      p.setAttribute("stroke-width", 5);
+      p.setAttribute("stroke-dasharray", dash + " " + (dash + 2 * gap));
       p.setAttribute("stroke-opacity", 0.9);
       p.setAttribute("stroke-linecap", "round");
       sg.appendChild(p);
+      // 2e passe : VERT decalle d'un demi-periode -> tirets verts
+      const p2 = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      p2.setAttribute("points", p.getAttribute("points"));
+      p2.setAttribute("fill", "none");
+      p2.setAttribute("stroke", "#2ecc71");
+      p2.setAttribute("stroke-width", 5);
+      p2.setAttribute("stroke-dasharray", dash + " " + (dash + 2 * gap));
+      p2.setAttribute("stroke-dashoffset", dash + gap);
+      p2.setAttribute("stroke-opacity", 0.9);
+      p2.setAttribute("stroke-linecap", "round");
+      sg.appendChild(p2);
     }
     world.appendChild(sg);
   }
@@ -2037,7 +2060,10 @@ function drawProfilContent(svg, W, H) {
       tx.setAttribute("font-size", big ? "15" : "11");
       tx.textContent = fmtH(t); svg.appendChild(tx);
     };
-    if (live && live.t) cur(live.t, "#ff7a00", true);
+    // v5.24.6 : curseur live VERT en MOUVEMENT ACTIF (liveMoving :
+    // dernier point < 10 min), GRIS en inactivite - etait orange fixe.
+    if (live && live.t)
+      cur(live.t, liveMoving() ? "#2ecc71" : "#8a94b0", true);
     if (liveProbe) cur(liveProbe.t, "#ffd60a", false);
   }
   profilCursor();
