@@ -1,6 +1,19 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.13 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.15 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.15 = MODE ADMIN SANS FUITE : REPO passe par le FRAGMENT
+     d'URL (#adm=<token>&repo=<owner>/<repo>) comme le token - plus
+     AUCUNE identite GitHub dans le source (Ctrl+U propre via le
+     portail). L'admin ouvre la galerie via son signet avec l'URL
+     complete ; sans fragment, mode admin absent. Compatible avec
+     l'ancien format #adm=<token> seul.
+     v5.24.14 = ANONYNAT : constante REPO VIDEE - le mode admin de la
+     galerie (API GitHub) revelait l'identite GitHub dans le source vu
+     via le portail (retour 21/10 : calque uMap distant + check-list
+     section 8). Mode admin -> desactive proprement ; l'edition des
+     commentaires passe par gerer.py. AUSSI : la carte uMap (bouton
+     🗺) ne doit PLUS contenir d'URL GitHub en donnee distante - voir
+     runbook portail, anonymat.
      v5.24.13 = FIX TAILLE BADGES (retour 21/10) : le critere v5.24.12
      testait la classe "alti" (= 1F/2F alti) au lieu de "p3" (= 3F
      mobile) -> 3F etait agrandi et 2F non, l'inverse du but. Desormais
@@ -658,10 +671,16 @@
 // inchange) ; via un portail/proxy, resolu vers le portail -> filtrage
 // effectif. NE PAS remettre d'URL absolue.
 const BASE = ".";
-// --- 2e ligne a adapter (mode admin) : le depot GitHub "user/projet".
-// NB : non deduisible de BASE (sur user.github.io/projet, l'user est
-// dans le sous-domaine, pas dans le chemin) - d'ou cette constante.
-const REPO = "gurtsepaqrt87/bivouac";
+// --- 2 lignes a adapter (mode admin) : l'identite du depot GitHub.
+// v5.24.15 : REPO ne vit PLUS dans le source - il passe par le FRAGMENT
+// d'URL, comme le token (#adm=<token>&repo=<owner>/<repo>). Le
+// fragment n'est JAMAIS envoye au serveur (pas dans les logs GitHub
+// ni du portail) ni ecrit dans le source (Ctrl+U) : l'ami qui passe
+// par le portail ne voit aucune identite. L'admin ouvre la galerie
+// avec son URL-complete en signet (bookmark) ; sans ce signet, le
+// mode admin est simplement absent.
+const H = new URLSearchParams(location.hash.slice(1));
+const REPO = H.get("repo") || null;
 // --- v5.18 : liens amis temporaires (déploiement VITRINE) ---
 // Un code par ami + date d'expiration ISO. Le lien ami :
 //   https://<user>.github.io/<vitrine>/?ami=<code>
@@ -1510,7 +1529,9 @@ async function loadComments() {
 // Le token (PAT GitHub a portee depot, Contents read+write) ne figure QUE
 // dans l'URL de votre navigateur (jamais dans le fichier partage) :
 // famille/amis n'ont pas de #adm= -> pas de zone de saisie.
-const ADM = location.hash.startsWith("#adm=") ? location.hash.slice(5) : null;
+// v5.24.15 : ADM aussi via URLSearchParams (meme fragment, cle "adm")
+// - l'ancien format #adm=<token> reste compatible.
+const ADM = H.get("adm") || null;
 if (ADM) document.getElementById("admBox").classList.add("on");
 document.getElementById("admSave").onclick = async () => {
   const btn = document.getElementById("admSave"), m = media[sel];
