@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.31 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.32 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.32 = PAGE D'ACCUEIL smartphone (retour 21/10) : 10 s au
+     refresh - cycliste voyageur (sacoches) + guide des gestes, carte
+     DEZOOMEE sur toutes les journees (fitAllDays), puces de dates
+     seules (chipsFlash 10 s) ; 1 tap ou 10 s -> retour nominal
+     (photo la plus recente + centrage + graph + zoom restaure).
      v5.24.31 = DOUBLE-TAP GRAPH ALTI SMARTPHONE (retour 21/10) :
      detection tactile NATIVE (le 2e tap n'emettait pas de click sur
      mobile, geste zoom natif) -> photo la plus proche + centrage
@@ -468,6 +473,15 @@
   #wrap.single.alti #btProfil, #wrap.single.alti #hdAlti,
   #wrap.single.showprofil #btProfil, #wrap.single.showprofil #hdAlti
     {display:flex}
+  /* v5.24.32 : PAGE D'ACCUEIL smartphone (10 s au refresh, 1 tap =
+     quitter) - cycliste voyageur + guide, par-dessus TOUT l'ecran */
+  #homeP{position:absolute;inset:0;z-index:1700;background:#0d1117f8;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:16px;text-align:center;gap:10px;cursor:pointer}
+  #homeP .guide{color:#8a94b0;font-size:13.5px;line-height:1.75;
+    text-align:left;max-width:340px}
+  #homeP .guide b{color:#ffd60a;font-weight:700}
+  #homeP svg{height:86px;max-width:220px}
   /* --- contrôles --- */
   #zoom{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:8px;z-index:1000}
     #zoom button{width:52px;height:52px;font-size:26px;font-weight:700;border-radius:12px;border:2px solid #b35300;background:#ff7a00;color:#fff;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
@@ -2960,11 +2974,103 @@ async function load() {
     // en mode "3 FENETRES" (photo+carte+alti = bouton ⛰ de la carte actif)
     if (MOBILE && !wrapEl.classList.contains("single")) {
       await openProfil();
+      // v5.24.32 : PAGE D'ACCUEIL 10 s - carte DEZOOMEE sur toutes
+      // les journees + guide des gestes + puces de dates seules ;
+      // 1 tap ou 10 s -> retour nominal (photo + centrage + graph).
+      // Le nominal (photo recente ouverte + alti) est deja en place
+      // derriere l'ecran d'accueil : le retour est immediat.
+      showHomePage();
+      fitAllDays();
+      chipsFlash(10000);
+    } else {
       centerActive();
     }
   } catch (e) { fail(e.message); }
 }
 window.addEventListener("resize", render);
+// ---------- v5.24.32 : PAGE D'ACCUEIL smartphone (10 s au refresh) ----------
+// Carte DEZOOMEE sur la globalite des journees + guide des gestes ;
+// alti : puces de dates seules (chipsFlash 10 s) ; 1 tap ou 10 s ->
+// retour au nominal (photo la plus recente + centrage + graph).
+let homeSaved = null, homeTimer = null;
+function fitAllDays() {
+  // bbox de TOUTES les traces -> zoom qui contient tout
+  let lo0 = 180, lo1 = -180, la0 = 90, la1 = -90;
+  for (const tr of traces) {
+    if (!tr.geometry) continue;
+    for (const c of tr.geometry.coordinates) {
+      if (c[0] < lo0) lo0 = c[0]; if (c[0] > lo1) lo1 = c[0];
+      if (c[1] < la0) la0 = c[1]; if (c[1] > la1) la1 = c[1];
+    }
+  }
+  if (lo1 < lo0) return;
+  for (let z = ZMAX; z > ZMIN; z--) {
+    if (lon2x(lo1, z) - lon2x(lo0, z) <= mapEl.clientWidth * 0.92
+        && lat2y(la0, z) - lat2y(la1, z)
+           <= (mapEl.clientHeight - profH) * 0.9) break;
+    zoom = z - 1;
+  }
+  clon = (lo0 + lo1) / 2;
+  clat = (la0 + la1) / 2;
+  render();
+}
+function homeCyclistSVG() {
+  return '<svg viewBox="0 0 220 110" fill="none">'
+    + '<circle cx="42" cy="88" r="17" stroke="#8a94b0" stroke-width="4"/>'
+    + '<circle cx="168" cy="88" r="17" stroke="#8a94b0" stroke-width="4"/>'
+    // cadre + fourche
+    + '<line x1="42" y1="88" x2="86" y2="56" stroke="#ff7a00" stroke-width="4" stroke-linecap="round"/>'
+    + '<line x1="86" y1="56" x2="128" y2="56" stroke="#ff7a00" stroke-width="4"/>'
+    + '<line x1="128" y1="56" x2="168" y2="88" stroke="#ff7a00" stroke-width="4"/>'
+    + '<line x1="86" y1="56" x2="86" y2="88" stroke="#ff7a00" stroke-width="4"/>'
+    + '<line x1="86" y1="88" x2="128" y2="88" stroke="#ff7a00" stroke-width="4"/>'
+    + '<line x1="128" y1="88" x2="128" y2="56" stroke="#ff7a00" stroke-width="4"/>'
+    + '<line x1="128" y1="56" x2="162" y2="42" stroke="#8a94b0" stroke-width="3" stroke-linecap="round"/>'
+    // porte-bagages + SACOCHES de voyage
+    + '<line x1="42" y1="88" x2="52" y2="74" stroke="#1c2230" stroke-width="3"/>'
+    + '<rect x="24" y="66" width="14" height="20" rx="2" fill="#1f77e5"/>'
+    + '<rect x="52" y="66" width="14" height="20" rx="2" fill="#1f77e5"/>'
+    // cycliste heureux : jambe, torse, bras, tete souriante
+    + '<line x1="86" y1="74" x2="104" y2="88" stroke="#1c2230" stroke-width="5" stroke-linecap="round"/>'
+    + '<line x1="86" y1="56" x2="78" y2="30" stroke="#1c2230" stroke-width="7" stroke-linecap="round"/>'
+    + '<line x1="80" y1="34" x2="122" y2="50" stroke="#1c2230" stroke-width="5" stroke-linecap="round"/>'
+    + '<circle cx="76" cy="20" r="10" fill="#ffd60a"/>'
+    + '<path d="M70 23q6 5 12 0" stroke="#1c2230" stroke-width="2" stroke-linecap="round"/>'
+    + '<circle cx="72" cy="18" r="1.4" fill="#1c2230"/><circle cx="80" cy="18" r="1.4" fill="#1c2230"/>'
+    + '</svg>';
+}
+function dismissHome() {
+  if (!document.getElementById("homeP")) return;
+  document.getElementById("homeP").remove();
+  clearTimeout(homeTimer);
+  // retour NOMINAL : photo la plus recente ouverte au boot, centrage
+  // sur son pointeur, zoom/centre d'origine, alti deja nominal.
+  if (homeSaved) {
+    zoom = homeSaved.zoom; clon = homeSaved.lon; clat = homeSaved.lat;
+  }
+  centerActive();
+}
+function showHomePage() {
+  if (document.getElementById("homeP")) return;
+  homeSaved = { zoom: zoom, lon: clon, lat: clat };
+  const d = document.createElement("div");
+  d.id = "homeP";
+  d.innerHTML = homeCyclistSVG()
+    + '<div class="guide">'
+    + '<b>Accueil</b> : 1 tap pour quitter la page<br>'
+    + '<b>Galerie</b> : d&eacute;filement des photos au gliss&eacute; droite/gauche<br>'
+    + '<b>Carte ou altim&eacute;trie</b> :<br>'
+    + '&nbsp;&nbsp;Simple tap : suivi horaire parcours/alti<br>'
+    + '&nbsp;&nbsp;Double tap : affiche la photo la plus proche<br>'
+    + '<b>Altim&eacute;trie</b> :<br>'
+    + '&nbsp;&nbsp;Gliss&eacute; gauche : vers la journ&eacute;e suivante<br>'
+    + '&nbsp;&nbsp;Gliss&eacute; droite : vers la journ&eacute;e pr&eacute;c&eacute;dente<br>'
+    + '<b>Bascule des fen&ecirc;tres</b> : 3F &lt;&gt; 2F &lt;&gt; 1F'
+    + '</div>';
+  d.onclick = () => dismissHome();
+  wrapEl.appendChild(d);
+  homeTimer = setTimeout(dismissHome, 10000);
+}
 // v5.17 : polling du live toutes les 30 s (cache-busting comme photos.csv)
 pollLive();
 setInterval(pollLive, 30000);
