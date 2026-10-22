@@ -1,6 +1,14 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.36 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.38 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.38 = ACCUEIL SMARTPHONE : alti en vue TOUTES JOURNEES
+     connues pendant l'accueil (au lieu des puces seules) - meme
+     panorama que le laptop v5.24.37 ; retour nominal inchange.
+     v5.24.37 = ACCUEIL LAPTOP PANORAMA (retour 21/10) : pendant
+     l'accueil - carte DEZOOMEE sur toutes les journees + alti en
+     TOUTES DATES ; au depart (clic ou 12 s) -> mode classique
+     restaure (1re photo de la journee la plus recente a media,
+     centrage, graph nominal) via restoreNominal().
      v5.24.36 = MODE LAPTOP (retour 21/10) : alti ACTIVEE par defaut
      au refresh ; PAGE D'ACCUEIL 'version laptop' dans la galerie
      (1er clic fige / 2nd clic quitte / 12 s - contenu distinct) ;
@@ -3045,21 +3053,37 @@ async function load() {
     // en mode "3 FENETRES" (photo+carte+alti = bouton ⛰ de la carte actif)
     if (MOBILE && !wrapEl.classList.contains("single")) {
       await openProfil();
-      // v5.24.32 : PAGE D'ACCUEIL 10 s - carte DEZOOMEE sur toutes
-      // les journees + guide des gestes + puces de dates seules ;
-      // 1 tap ou 10 s -> retour nominal (photo + centrage + graph).
-      // Le nominal (photo recente ouverte + alti) est deja en place
-      // derriere l'ecran d'accueil : le retour est immediat.
+      // v5.24.32/38 : PAGE D'ACCUEIL - carte DEZOOMEE sur toutes les
+      // journees + guide des gestes ; v5.24.38 : ALTI en vue TOUTES
+      // JOURNEES CONNUES (au lieu des puces seules) - panorama du
+      // voyage, comme le laptop v5.24.37. 1er tap fige, 2 tap quitte,
+      // 12 s sinon -> restoreNominal() (photo recente + centrage +
+      // graph de sa date, selections purgees).
       showHomePage(false);
       fitAllDays();
-      chipsFlash(10000);
+      const allDatesM = profilData ? Object.keys(profilData.dates) : [];
+      if (allDatesM.length) {
+        prManual = new Set(allDatesM);
+        prTouched = true;
+        syncPrDates(); drawProfil();
+      }
     } else {
-      // v5.24.36 (retour 21/10) : LAPTOP - alti ACTIVEE par defaut au
-      // rafraichissement + PAGE D'ACCUEIL 'version laptop' dans la
-      // galerie : 1er clic fige, 2nd clic quitte, 12 s sinon.
+      // v5.24.36/37 (retour 21/10) : LAPTOP - alti ACTIVEE par defaut
+      // + PAGE D'ACCUEIL 'version laptop' dans la galerie (1er clic
+      // fige, 2nd clic quitte, 12 s sinon). PENDANT l'accueil :
+      // carte DEZOOMEE sur TOUTES les journees + alti en vue
+      // TOUTES DATES (panorama du voyage) ; au depart -> retour au
+      // mode classique (photo recente, centrage, graph nominal).
       await openProfil();
       centerActive();
       showHomePage(true);
+      fitAllDays();
+      const allDates = profilData ? Object.keys(profilData.dates) : [];
+      if (allDates.length) {
+        prManual = new Set(allDates);
+        prTouched = true;
+        syncPrDates(); drawProfil();
+      }
     }
   } catch (e) { fail(e.message); }
 }
@@ -3120,10 +3144,21 @@ function dismissHome() {
   document.getElementById("homeP").remove();
   clearTimeout(homeTimer);
   homeFrozen = false;             // v5.24.34 : reinitialiser le gel
-  // retour NOMINAL : photo la plus recente ouverte au boot, centrage
-  // sur son pointeur, zoom/centre d'origine, alti deja nominal.
+  restoreNominal();
+}
+// v5.24.37 : retour au MODE CLASSIQUE apres l'accueil (laptop comme
+// mobile) - 1re photo de la journee la plus RECENTE ayant un media,
+// carte centree (zoom/centre d'origine), alti = graph de CETTE date
+// (les selections "toutes dates" de l'accueil laptop sont purgees).
+function restoreNominal() {
+  const lastDate = [...new Set(media.map(m => m.date))].sort().pop();
+  const i = lastDate ? media.findIndex(m => m.date === lastDate) : -1;
+  if (i >= 0) openGal(i);
+  prManual = new Set(); prTouched = false;
+  syncPrDates(); drawProfil();
   if (homeSaved) {
     zoom = homeSaved.zoom; clon = homeSaved.lon; clat = homeSaved.lat;
+    homeSaved = null;
   }
   centerActive();
 }
