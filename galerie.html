@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.40 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.41 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.41 = FILM D'ACCUEIL + CADRE DATE (retour 21/10) : le
+     balayage temporel attend 3 s (vue d'ensemble) puis boucle le
+     voyage en 9 s, et CONTINUE tant que l'accueil reste affiche ;
+     cadre de lecture continue colore a la COULEUR DE LA DATE
+     affichee (marqueurs carte / courbes alti), mis a jour au fil
+     du defilement.
      v5.24.40 = FILM D'ACCUEIL (retour 21/10, smartphone ET laptop) :
      pendant l'affichage de la page d'accueil, lecture TEMPORELLE
      RAPIDE - le curseur photo balaie tout le voyage (carte centree
@@ -2937,10 +2943,20 @@ new ResizeObserver(entries => {
 // curseur photo au fil des photos). S'arrete a la DERNIERE photo ou
 // si un glisse/video prend la main ; glisse = navigation manuelle.
 let autoTimer = null;
-// v5.24.39 : CADRE visible pendant la lecture continue (retour
-// 21/10) - liseré jaune sur les contours de la fenetre photo,
-// pose/retire avec la lecture, smartphone ET laptop.
-function autoFrame(on) { mediaEl.classList.toggle("autoOn", !!on); }
+// v5.24.39/41 : CADRE de lecture continue - liseré sur les contours
+// de la fenetre photo. v5.24.41 : la couleur n'est plus le jaune
+// fixe mais la COULEUR DE LA DATE affichee (celle des marqueurs
+// carte et des courbes alti), mise a jour au fil du defilement ;
+// retour au jaune par defaut si la date n'a pas de couleur.
+function autoFrame(on) {
+  mediaEl.classList.toggle("autoOn", !!on);
+  mediaEl.style.outlineColor = "";
+  if (on) autoFrameSync();
+}
+function autoFrameSync() {          // couleur date courante
+  if (autoTimer && media[sel])
+    mediaEl.style.outlineColor = prColor(media[sel].date) || "#ffd60a";
+}
 function autoStop() {
   if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
   autoFrame(false);
@@ -2952,6 +2968,7 @@ function autoToggle() {
     if (liveMode || sel >= media.length - 1) { autoStop(); return; }
     openGal(sel + 1);
     centerActive();          // suivi horaire : carte centree + alti
+    autoFrameSync();         // v5.24.41 : couleur du cadre = date
   }, 4000);   // v5.24.35 : 4 s par photo (retour 21/10 - etait 2 s)
 }
 let swipe = null;
@@ -3167,27 +3184,31 @@ function dismissHome() {
   homePlaybackStop();             // v5.24.40 : couper le film d'accueil
   restoreNominal();
 }
-// v5.24.40 : LECTURE TEMPORELLE RAPIDE pendant l'accueil (retour
+// v5.24.40/41 : LECTURE TEMPORELLE RAPIDE pendant l'accueil (retour
 // 21/10, smartphone ET laptop) : le curseur photo balaie TOUT le
-// voyage a vitesse rapide - la carte suit (centrage) et l'alti
-// affiche le curseur au fil des heures. Cadence : le voyage entier
-// tient dans les 12 s du timer (sauts de plusieurs photos par
-// tick 300 ms - plus fluide qu'un defile photo par photo sur
-// smartphone) ; si la page est FIGEE (1er tap/clic), le balayage
-// CONTINUE en boucle jusqu'a la sortie de l'accueil.
-let homePlay = null;
+// voyage - la carte suit (centrage) et l'alti affiche le curseur au
+// fil des heures. v5.24.41 : d'abord une PAUSE de 3 s (vue d'ensemble
+// du voyage, carte dezoomee + alti toutes dates), PUIS defilement
+// tres rapide qui boucle tout le voyage en 9 s ; le balayage
+// CONTINUE (en boucle) tant que la page d'accueil reste affichee
+// (y compris figee), jusqu'a la sortie.
+let homePlay = null, homePlayDelay = null;
 function homePlaybackStart() {
-  if (homePlay || !media.length) return;
-  const pas = Math.max(1, Math.ceil(media.length / 40));  // ~40 ticks / 12 s
-  homePlay = setInterval(() => {
-    if (!document.getElementById("homeP")) { homePlaybackStop(); return; }
-    let i = sel + pas;
-    if (i >= media.length) i = 0;                         // boucle (page figee)
-    openGal(i);          // curseur : carte + alti suivent (galerie couverte)
-    centerActive();
-  }, 300);
+  if (homePlay || homePlayDelay || !media.length) return;
+  homePlayDelay = setTimeout(() => {        // v5.24.41 : pause 3 s
+    homePlayDelay = null;
+    const pas = Math.max(1, Math.ceil(media.length / 30));  // 9 s : 30 ticks
+    homePlay = setInterval(() => {
+      if (!document.getElementById("homeP")) { homePlaybackStop(); return; }
+      let i = sel + pas;
+      if (i >= media.length) i = 0;         // boucle tant que l'accueil est affiche
+      openGal(i);          // curseur : carte + alti suivent (galerie couverte)
+      centerActive();
+    }, 300);
+  }, 3000);
 }
 function homePlaybackStop() {
+  if (homePlayDelay) { clearTimeout(homePlayDelay); homePlayDelay = null; }
   if (homePlay) { clearInterval(homePlay); homePlay = null; }
 }
 // v5.24.37 : retour au MODE CLASSIQUE apres l'accueil (laptop comme
