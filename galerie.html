@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.15 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.16 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.16 = ALTI LAPTOP (retour 21/10) : (1) FIX troncature bas de
+     courbe a la selection d'une date - le tracé complet n'etait pas
+     borne par la hauteur VISIBLE (borne v5.16.19 appliquee au seul
+     tracé partiel) ; (2) badges fiabilite en mots entiers jusqu'a
+     10 dates (etait 3).
      v5.24.15 = MODE ADMIN SANS FUITE : REPO passe par le FRAGMENT
      d'URL (#adm=<token>&repo=<owner>/<repo>) comme le token - plus
      AUCUNE identite GitHub dans le source (Ctrl+U propre via le
@@ -1962,6 +1967,18 @@ function drawProfil(full) {
     if (H > maxH) H = maxH;
     if (H < 60) H = 60;
     W = Math.max(120, Math.round(rPan.width) - 16);
+    // v5.24.16 : TRONCATURE BAS DE COURBE (retour 21/10, laptop) :
+    // le tracé PARTIEL etait deja borne par la hauteur VISIBLE du
+    // wrapper (fix v5.16.19), pas le tracé COMPLET. A la SELECTION
+    // d'une date, la ligne de puces grandit/enveloppe -> la zone
+    // visible retrecit, mais H (mesure panneau - puces - 12) restait
+    // plus grand -> bas de l'echelle et bas de courbe hors ecran,
+    // surtout en grande amplitude / altitude min proche de 0. On
+    // applique la MEME borne que le chemin partiel.
+    const wrapR0 = document.getElementById("prWrap").getBoundingClientRect();
+    const visH0 = Math.round(wrapR0.height);
+    if (H > visH0) H = visH0;
+    if (H < 60) H = 60;
     lastPrMode = modeKey; lastPrH = H; lastPrW = W;
   }
   svg.style.width = W + "px"; svg.style.height = H + "px";
@@ -2060,7 +2077,10 @@ function drawProfilContent(svg, W, H) {
     } else if (srcData) {
       const frac = srcData[b.d];
       if (frac != null) {
-        const plein = blocks.length <= 3;
+        // v5.24.16 : mots ENTIERS jusqu'a 10 dates selectionnees
+        // (retour 21/10 - etait <= 3) ; formes courtes au-dela.
+        // Couleurs inchangees.
+        const plein = blocks.length <= 10;
         let txt, col, strike = false;
         // v5.24.13 : CORRECTION du critere - le 3F mobile est la classe
         // p3 (la classe alti = 1F/2F alti, d'ou l'inversion observee
