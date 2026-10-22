@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.25 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.26 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.26 = FIX BOUTON ALTI 1F CARTE (retour 21/10) : le masquage
+     v5.24.22 etait trop large - en vue 1F CARTE le ⛰ de la pile
+     zoom doit rester visible pour basculer en 2F carte+alti ; il
+     n'est desormais masque qu'en vue 1F PHOTO (:not(.showmap)).
      v5.24.25 = FIX ECHELLE HORAIRE INVISIBLE (5e retour 21/10, cause
      PROUVEE par console : H=240 px pour un prWrap de 168 px - le bas
      du SVG etait clippe : echelle du bas + grille basse invisibles,
@@ -430,11 +434,12 @@
     align-items:center;height:100%;background:#000;color:#ffd60a;
     font-weight:700;text-align:center;padding:0 12px;line-height:1.9;
     font-size:15px}
-  /* v5.24.22 : smartphone, vue 1F - boutons ALTI caches (BOUTONS :
-  pile de zoom #btProfil ET barre du haut #hdAlti - le point 2 de la
-  v5.24.21 ne visait que #btProfil, mauvais bouton). Le bouton CARTE
-  reste. Re-affiches si l'alti 1F est DEJA ouverte (fermeture possible). */
-  #wrap.single #btProfil, #wrap.single #hdAlti{display:none}
+  /* v5.24.26 : smartphone, vue 1F - boutons ALTI caches UNIQUEMENT en
+  vue 1F PHOTO (:not(.showmap)) - la v5.24.22 masquait aussi le ⛰ de
+  la pile zoom en vue 1F CARTE, ou il est necessaire pour basculer
+  en 2F carte+alti (retour 21/10). Le bouton CARTE reste partout. */
+  #wrap.single:not(.showmap) #btProfil,
+  #wrap.single:not(.showmap) #hdAlti{display:none}
   #wrap.single.alti #btProfil, #wrap.single.alti #hdAlti,
   #wrap.single.showprofil #btProfil, #wrap.single.showprofil #hdAlti
     {display:flex}
