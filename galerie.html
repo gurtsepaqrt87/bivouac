@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.22 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.23 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.23 = FIX troncature haut laptop (3e retour 21/10) : les
+     CLICS SUR PUCES invalident le cache de geometrie (lastPrMode)
+     -> re-mesure complete du panneau a chaque selection de date
+     (le chemin v5.24.21/22 bornait la hauteur cachee mais ne
+     re-mesurait pas ; la repro passait par les puces).
      v5.24.22 = 2e RETOUR v5.24.21 : (2) 1F - les DEUX boutons alti
      caches (#btProfil pile + #hdAlti barre - la v5.24.21 ne visait
      que le mauvais), re-affiches si alti 1F ouverte ; (3) fix
@@ -1967,7 +1972,20 @@ async function openProfil() {
       c.className = "prChip"; c.textContent = d;
       c.onclick = () => { prManual.has(d) ? prManual.delete(d) : prManual.add(d);
                            prTouched = true;            // v5.21 : plus d'ajout auto
-                           syncPrDates(); drawProfil(); };
+                           syncPrDates();
+                           // v5.24.23 : troncature haut laptop (3e retour)
+                           // - la repro passe TOUJOURS par les puces
+                           // (deselectionner la date du refresh puis
+                           // en selectionner une autre) : ce chemin
+                           // n'appliquait JAMAIS la re-mesure complete
+                           // (modeKey inchange -> hauteur CACHEE, meme
+                           // bornee). On INVALIDE le cache de geome-
+                           // trie : chaque clic sur puce re-mesure
+                           // panneau/puces/zone visible comme a
+                           // l'ouverture (chemin v5.16.6-8, le plus
+                           // eprouve) - plus d'etat residuel possible.
+                           lastPrMode = null;
+                           drawProfil(); };
       chips.appendChild(c);
     }
   }
