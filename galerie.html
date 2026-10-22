@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.33 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.34 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.34 = ACCUEIL + LECTURE CONTINUE (retour 21/10) : accueil
+     smartphone 1 tap FIGE (cadre jaune) / 2 tap QUITTE / expiration
+     12 s ; galerie smartphone : TAP = On/Off de la lecture continue
+     (2 s/photo, carte centree + alti suivent = suivi horaire),
+     arret auto a la derniere photo ; guide mis a jour.
      v5.24.33 = ACCUEIL AFFINE (retour 21/10) : smartphone - borne a
      la FENETRE DU HAUT (carte + puces visibles dessous) ; laptop -
      double-tap sans media = page d'ACCUEIL (cycliste + guide) en
@@ -485,6 +490,7 @@
     line-height:1.75;text-align:left;max-width:340px}
   #homeP .guide b,.homeCard .guide b{color:#ffd60a;font-weight:700}
   #homeP svg{height:86px;max-width:220px}
+  #homeP.frozen{outline:3px solid #ffd60a;outline-offset:-3px}   /* fige */
   /* v5.24.33 : accueil en REMPLACEMENT DE L'ECRAN NOIR (double-tap
      sans media, laptop) - meme contenu, sans timer ni centrage */
   .homeCard{display:flex;flex-direction:column;justify-content:center;
@@ -1241,8 +1247,11 @@ function renderClassicProbe() {
 // courante ; la navigation suivante (openGal) la remplace.
 function homeGuideHTML() {
   return '<div class="guide">'
-    + '<b>Accueil</b> : 1 tap pour quitter la page<br>'
-    + '<b>Galerie</b> : d&eacute;filement des photos au gliss&eacute; droite/gauche<br>'
+    // v5.24.34 : guide mis a jour (figer/quitter, lecture continue)
+    + '<b>Accueil</b> : 1 tap pour figer, 2 tap pour quitter la page<br>'
+    + '<b>Galerie</b> : gliss&eacute; droite/gauche pour d&eacute;filement'
+    + ' manuel<br>'
+    + '&nbsp;&nbsp;tap : On/Off de la lecture continue<br>'
     + '<b>Carte ou altim&eacute;trie</b> :<br>'
     + '&nbsp;&nbsp;Simple tap : suivi horaire parcours/alti<br>'
     + '&nbsp;&nbsp;Double tap : affiche la photo la plus proche<br>'
@@ -2880,6 +2889,23 @@ new ResizeObserver(entries => {
   .observe(document.getElementById("profil"));
 
 // ---------- glissé sur la photo/video : navigation precedente/suivante ----------
+// v5.24.34 : LECTURE CONTINUE smartphone (retour 21/10) - tap sur la
+// galerie = On/Off : defilement automatique a 2 s par photo, avec
+// SUIVI HORAIRE CLASSIQUE (la carte se centre et l'alti suit le
+// curseur photo au fil des photos). S'arrete a la DERNIERE photo ou
+// si un glisse/video prend la main ; glisse = navigation manuelle.
+let autoTimer = null;
+function autoStop() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+}
+function autoToggle() {
+  if (autoTimer) { autoStop(); return; }   // deja en lecture -> arret
+  autoTimer = setInterval(() => {
+    if (liveMode || sel >= media.length - 1) { autoStop(); return; }
+    openGal(sel + 1);
+    centerActive();          // suivi horaire : carte centree + alti
+  }, 2000);
+}
 let swipe = null;
 mediaEl.addEventListener("pointerdown", e => { swipe = { x: e.clientX, y: e.clientY }; });
 mediaEl.addEventListener("pointerup", e => {
@@ -2889,7 +2915,11 @@ mediaEl.addEventListener("pointerup", e => {
   // seuil 60 px ET majoritairement horizontal (pour ne pas confondre
   // avec un appui sur les commandes video, ni avec un scroll vertical)
   if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5)
-    openGal(dx < 0 ? sel + 1 : sel - 1);   // glisse a gauche => suivant
+    { autoStop(); openGal(dx < 0 ? sel + 1 : sel - 1); }   // glisse a gauche => suivant
+  // v5.24.34 : TAP immobile (hors video/boutons) = On/Off lecture
+  else if (MOBILE && Math.abs(dx) < 12 && Math.abs(dy) < 12
+           && !e.target.closest("video,button,a,select"))
+    autoToggle();
 });
 // ---------- poignee de redimensionnement galerie <-> carte ----------
 const splitEl = document.getElementById("split");
@@ -3010,7 +3040,7 @@ window.addEventListener("resize", render);
 // Carte DEZOOMEE sur la globalite des journees + guide des gestes ;
 // alti : puces de dates seules (chipsFlash 10 s) ; 1 tap ou 10 s ->
 // retour au nominal (photo la plus recente + centrage + graph).
-let homeSaved = null, homeTimer = null;
+let homeSaved = null, homeTimer = null, homeFrozen = false;
 function fitAllDays() {
   // bbox de TOUTES les traces -> zoom qui contient tout
   let lo0 = 180, lo1 = -180, la0 = 90, la1 = -90;
@@ -3061,6 +3091,7 @@ function dismissHome() {
   if (!document.getElementById("homeP")) return;
   document.getElementById("homeP").remove();
   clearTimeout(homeTimer);
+  homeFrozen = false;             // v5.24.34 : reinitialiser le gel
   // retour NOMINAL : photo la plus recente ouverte au boot, centrage
   // sur son pointeur, zoom/centre d'origine, alti deja nominal.
   if (homeSaved) {
@@ -3076,9 +3107,16 @@ function showHomePage() {
   // v5.24.33 : borne a la FENETRE DU HAUT (#side = galerie +
   // commentaires) - la carte et les puces restent visibles.
   d.innerHTML = homeCyclistSVG() + homeGuideHTML();
-  d.onclick = () => dismissHome();
+  // v5.24.34 (retour 21/10) : 1 tap FIGE (arret du compte a rebours),
+  // 2 tap QUITTE ; expiration 12 s.
+  d.onclick = () => {
+    if (!homeFrozen) {
+      homeFrozen = true; clearTimeout(homeTimer);
+      d.classList.add("frozen");
+    } else dismissHome();
+  };
   document.getElementById("side").appendChild(d);
-  homeTimer = setTimeout(dismissHome, 10000);
+  homeTimer = setTimeout(dismissHome, 12000);
 }
 // v5.17 : polling du live toutes les 30 s (cache-busting comme photos.csv)
 pollLive();
