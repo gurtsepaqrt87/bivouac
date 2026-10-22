@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.34 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.35 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.35 = LECTURE CONTINUE : 4 s par photo (etait 2 s).
      v5.24.34 = ACCUEIL + LECTURE CONTINUE (retour 21/10) : accueil
      smartphone 1 tap FIGE (cadre jaune) / 2 tap QUITTE / expiration
      12 s ; galerie smartphone : TAP = On/Off de la lecture continue
@@ -2904,7 +2905,7 @@ function autoToggle() {
     if (liveMode || sel >= media.length - 1) { autoStop(); return; }
     openGal(sel + 1);
     centerActive();          // suivi horaire : carte centree + alti
-  }, 2000);
+  }, 4000);   // v5.24.35 : 4 s par photo (retour 21/10 - etait 2 s)
 }
 let swipe = null;
 mediaEl.addEventListener("pointerdown", e => { swipe = { x: e.clientX, y: e.clientY }; });
