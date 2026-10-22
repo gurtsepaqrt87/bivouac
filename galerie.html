@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.24 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.25 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.25 = FIX ECHELLE HORAIRE INVISIBLE (5e retour 21/10, cause
+     PROUVEE par console : H=240 px pour un prWrap de 168 px - le bas
+     du SVG etait clippe : echelle du bas + grille basse invisibles,
+     visibles seulement sur les journees a courbe haute). Remede :
+     H mesure DIRECTEMENT dans prWrap (conteneur reel, flex:1), dans
+     les DEUX branches (mesure ET cache), au lieu de panneau-puces-12.
      v5.24.24 = FIX TRONCATURE HAUT PANNEAU ALTI laptop (preuve
      visuelle 21/10) : hauteur du panneau bornee par la zone VISIBLE
      (viewport) et non plus 35 % de la hauteur TOTALE du conteneur
@@ -2216,17 +2222,23 @@ function drawProfil(full) {
     // inchange = branche cache). On applique la MEME borne que la
     // branche de mesure : H bute sur la zone visible du conteneur
     // carte (visTop -> bas de carte).
-    const rPan2 = pan.getBoundingClientRect();
-    const rMw2 = document.getElementById("mapwrap")
-                   .getBoundingClientRect();
-    const visTop2 = Math.max(rPan2.top, rMw2.top);
-    const maxH2 = Math.round(rMw2.bottom - visTop2) - 12;
-    if (H > maxH2) H = maxH2;
+    // v5.24.25 : idem branche CACHEE - borne par prWrap ACTUEL
+    // (simple et direct : le SVG ne peut pas depasser son conteneur).
+    const rPrWc = document.getElementById("prWrap").getBoundingClientRect();
+    if (H > Math.round(rPrWc.height) - 4) H = Math.round(rPrWc.height) - 4;
     if (H < 60) H = 60;
     lastPrH = H;
     W = Math.max(120, W);
   } else {
-    H = Math.round(rPan.height) - chipsH - 12;
+    // v5.24.25 : MESURE DIRECTE de prWrap (conteneur reel du SVG) -
+    // preuve console 21/10 : H=240 px alors que prWrap n'affiche que
+    // 168 px -> bas du SVG CLIPPE : echelle horaire du BAS (journees
+    // dont la courbe vit en haut) et etiquette de grille la plus
+    // basse invisibles. La formule "panneau - puces - 12" restait
+    // vulnerable aux etats transitoires ; prWrap (flex:1) EST la
+    // place exacte disponible, au moment present.
+    const rPrW = document.getElementById("prWrap").getBoundingClientRect();
+    H = Math.max(60, Math.round(rPrW.height) - 4);
     // v5.16.8 : borne aussi par le HAUT - si le panneau (absolute,
     // bottom:0) depasse au-dessus du conteneur (hauteur residuelle trop
     // grande), la partie visible commence au top du conteneur : sans
