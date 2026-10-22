@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.21 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.22 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.22 = 2e RETOUR v5.24.21 : (2) 1F - les DEUX boutons alti
+     caches (#btProfil pile + #hdAlti barre - la v5.24.21 ne visait
+     que le mauvais), re-affiches si alti 1F ouverte ; (3) fix
+     troncature HAUT laptop : la branche CACHEE de drawProfil borne
+     desormais H par la zone VISIBLE (visTop->bas carte, comme la
+     branche mesure) - la borne prWrap (layout) ne suffisait pas
+     quand la poignee ⌄ agrandit le panneau au-dela du visible.
      v5.24.21 = (1) ALTI SMARTPHONE : 3+ journees -> dates jj/mm
      (regle unifiee ; avant 5+) ; 1-2 journees -> date jj/mm au
      bas-centre au-dessus des heures (9 px, #8a94b0). (2) 1F :
@@ -405,10 +412,14 @@
     align-items:center;height:100%;background:#000;color:#ffd60a;
     font-weight:700;text-align:center;padding:0 12px;line-height:1.9;
     font-size:15px}
-  /* v5.24.21 : smartphone, vue 1F - bouton ALTI cache (pas utile en
-     plein ecran photo ; le bouton CARTE reste) */
-  #wrap.single #btProfil{display:none}
-  #wrap.single.showprofil #btProfil{display:block}   /* 1F alti ouverte : reste accessible */
+  /* v5.24.22 : smartphone, vue 1F - boutons ALTI caches (BOUTONS :
+  pile de zoom #btProfil ET barre du haut #hdAlti - le point 2 de la
+  v5.24.21 ne visait que #btProfil, mauvais bouton). Le bouton CARTE
+  reste. Re-affiches si l'alti 1F est DEJA ouverte (fermeture possible). */
+  #wrap.single #btProfil, #wrap.single #hdAlti{display:none}
+  #wrap.single.alti #btProfil, #wrap.single.alti #hdAlti,
+  #wrap.single.showprofil #btProfil, #wrap.single.showprofil #hdAlti
+    {display:flex}
   /* --- contrôles --- */
   #zoom{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:8px;z-index:1000}
     #zoom button{width:52px;height:52px;font-size:26px;font-weight:700;border-radius:12px;border:2px solid #b35300;background:#ff7a00;color:#fff;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
@@ -2155,13 +2166,24 @@ function drawProfil(full) {
   let H, W;
   if (modeKey === lastPrMode && lastPrH > 0 && lastPrW > 0) {
     H = lastPrH; W = lastPrW;
-    // v5.24.21 : FIX troncature HAUT (laptop, retour 21/10) - la
-    // hauteur CACHEE du mode pouvait DEPASSER la zone visible (pane
-    // plus haut que l'ecran utile : haut du graphe et ECHELLE DE
-    // TEMPS en haut coupes). La borne v5.24.16 n'etait appliquee
-    // qu'au chemin MESURE ; ici, chemin CACHE, on borne pareil.
-    const wrapRc = document.getElementById("prWrap").getBoundingClientRect();
-    H = Math.max(60, Math.min(H, Math.round(wrapRc.height)));
+    // v5.24.22 : FIX troncature HAUT (laptop, 2e retour 21/10) - la
+    // borne v5.24.21 (hauteur prWrap) ne suffisait pas : quand le
+    // panneau est AGANDI via la poignee ⌄ au-dela de la zone visible
+    // de la carte, prWrap garde sa hauteur de LAYOUT (plus grande que
+    // la zone VISIBLE) -> haut du graphe + echelle de temps coupes
+    // (reproduit : deselectionner la journee du refresh puis en
+    // selectionner une autre - les puces ne re-mesurent pas, modeKey
+    // inchange = branche cache). On applique la MEME borne que la
+    // branche de mesure : H bute sur la zone visible du conteneur
+    // carte (visTop -> bas de carte).
+    const rPan2 = pan.getBoundingClientRect();
+    const rMw2 = document.getElementById("mapwrap")
+                   .getBoundingClientRect();
+    const visTop2 = Math.max(rPan2.top, rMw2.top);
+    const maxH2 = Math.round(rMw2.bottom - visTop2) - 12;
+    if (H > maxH2) H = maxH2;
+    if (H < 60) H = 60;
+    lastPrH = H;
     W = Math.max(120, W);
   } else {
     H = Math.round(rPan.height) - chipsH - 12;
