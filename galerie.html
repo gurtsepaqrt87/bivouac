@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.30 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.31 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.31 = DOUBLE-TAP GRAPH ALTI SMARTPHONE (retour 21/10) :
+     detection tactile NATIVE (le 2e tap n'emettait pas de click sur
+     mobile, geste zoom natif) -> photo la plus proche + centrage
+     carte + curseur photo PLEIN (sonde pointillee remplacee) ; le
+     simple tap reste la sonde (recentrage OK), le glisse les jours.
      v5.24.30 = SONDE : tap courbe CENTRE la carte sur le point jaune
      (retour 21/10, journee sans media : la sonde etait posee hors
      champ) ; zoom molette : la SONDE prime sur la photo affichee
@@ -2687,9 +2692,15 @@ function prSwipeDir(dayDir) {
 }
 (function () {   // capteurs tactiles sur le panneau alti
   let sx = 0, sy = 0, st = 0;
+  // v5.24.31 : double-tap TACTILE sur la courbe (retour 21/10) - sur
+  // smartphone, le 2e tap n'emet pas toujours de click (geste zoom
+  // natif du navigateur) : la detection par click (laptop) ne suffit
+  // pas. Meme regle : 2 taps < 350 ms, < 30 px d'ecart -> photo la
+  // plus proche (+ recentrage carte) ; le simple tap reste la sonde.
+  let lastTT = 0, lastTX = 0, lastTY = 0;
   const pan = document.getElementById("prSvg");
   pan.addEventListener("touchstart", e => {
-    if (e.touches.length !== 1) { st = 0; return; }
+    if (e.touches.length !== 1) { st = 0; lastTT = 0; return; }
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
     st = Date.now();
   }, { passive: true });
@@ -2700,7 +2711,19 @@ function prSwipeDir(dayDir) {
     if (Math.abs(dx) > 40 && Math.abs(dx) > 2 * Math.abs(dy)) {
       lastSwipeT = Date.now();
       prSwipeDir(dx < 0 ? 1 : -1);   // gauche = suivante, droite = precedente
+      lastTT = 0;
+      return;
     }
+    // v5.24.31 : pas un glisse -> DOUBLE-TAP ?
+    const now = Date.now();
+    const r = pan.getBoundingClientRect();
+    const x = e.changedTouches[0].clientX - r.left;
+    const y = e.changedTouches[0].clientY - r.top;
+    if (now - lastTT < 350 && Math.hypot(x - lastTX, y - lastTY) < 30) {
+      lastSwipeT = Date.now();       // neutralise le click residuel
+      graphDoubleTap(x);
+      lastTT = 0;
+    } else { lastTT = now; lastTX = x; lastTY = y; }
   }, { passive: true });
 })();
 document.getElementById("prSvg").addEventListener("click", e => {
