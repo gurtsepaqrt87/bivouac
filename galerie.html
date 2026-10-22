@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.23 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.24 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.24 = FIX TRONCATURE HAUT PANNEAU ALTI laptop (preuve
+     visuelle 21/10) : hauteur du panneau bornee par la zone VISIBLE
+     (viewport) et non plus 35 % de la hauteur TOTALE du conteneur
+     carte - le panneau remontait au-dessus de l'ecran (✕, poignee et
+     echelle de temps en haut invisibles ; visible seulement sur les
+     dates dont la courbe vit en bas = echelle en haut ; F12 = toutes
+     dates). C'est la vraie cause apres 4 correctifs partiels.
      v5.24.23 = FIX troncature haut laptop (3e retour 21/10) : les
      CLICS SUR PUCES invalident le cache de geometrie (lastPrMode)
      -> re-mesure complete du panneau a chaque selection de date
@@ -2153,8 +2160,23 @@ function drawProfil(full) {
     pan.style.flex = ""; pan.style.marginTop = "";
     pan.style.height = Math.round(mwH * 0.40) + "px";   // 3F smartphone
   } else {
+    // v5.24.24 : FIX TRONCATURE HAUT PANNEAU (laptop, 4e retour 21/10,
+    // preuve visuelle : le bord haut du panneau, le ✕ et l'echelle
+    // placee en haut etaient AU-DESSUS de la zone visible). Cause :
+    // pan.style.height = 35 % de mwH, la hauteur TOTALE du conteneur
+    // carte - qui depasse parfois le viewport (fenetre petite, F12,
+    // barres du navigateur) ; le panneau ancre en bas remonte alors
+    // hors ecran. On borne la hauteur par la zone VISIBLE du
+    // conteneur (du haut visible au bas de la fenetre).
+    const rMwB = document.getElementById("mapwrap")
+                   .getBoundingClientRect();
+    const visTopB = Math.max(rMwB.top, 0);
+    const maxPaneH = Math.max(120,
+      Math.round(window.innerHeight - visTopB - 8));
+    let ph = Math.round(mwH * 0.35);   // overlay laptop
+    if (ph > maxPaneH) ph = maxPaneH;
     pan.style.flex = ""; pan.style.marginTop = "";
-    pan.style.height = Math.round(mwH * 0.35) + "px";   // overlay laptop
+    pan.style.height = ph + "px";
   }
   const svg = document.getElementById("prSvg");
   // v5.16.7 : mesurer le RECTANGLE REEL du panneau (getBoundingClientRect)
