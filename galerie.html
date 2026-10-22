@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.19 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.20 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.20 = GLISSE HORIZONTAL ALTI (smartphone, retour 21/10) :
+     gauche = journee suivante (graphe seul + 1re photo + carte
+     centree), droite = journee precedente (+ DERNIERE photo +
+     carte centree) ; journee sans media = graphe seul, galerie
+     inchangee ; clic residuel du glisse neutralise.
      v5.24.19 = DOUBLE-TAP ALTI (retour 21/10) : photo la plus proche
      ouverte + carte RECENTREE sur son marqueur ; si aucune photo a
      moins de 90 min (journee sans media) : carte recentree sur le
@@ -2471,6 +2476,60 @@ function profilCursor() {
   tx.textContent = fmtH(tc / 1000) + "  " + Math.round(e) + "m";
   svg.appendChild(tx);
 }
+// v5.24.20 : GLISSE HORIZONTAL dans la fenetre alti (smartphone) :
+// glisse vers la GAUCHE -> journee SUIVANTE (graphe seul sur cette
+// journee + 1re photo de la journee ouverte + carte centree) ;
+// glisse vers la DROITE -> journee PRECEDENTE (+ DERNIERE photo de
+// la journee + carte centree). Reference = date de la photo affichee
+// (sinon derniere date selectionnee). Journees sans media : le graphe
+// bascule, la galerie garde la photo courante (pas de media a ouvrir).
+let lastSwipeT = 0;
+function prSwipeDir(dayDir) {
+  if (!profilData || !profilData.dates) return;
+  const dispo = Object.keys(profilData.dates).sort();
+  if (!dispo.length) return;
+  const ref = (media[sel] && media[sel].date) || null;
+  if (!ref) return;
+  let cible = null;
+  if (dayDir > 0) { for (const d of dispo) if (d > ref) { cible = d; break; } }
+  else { for (let i = dispo.length - 1; i >= 0; i--)
+           if (dispo[i] < ref) { cible = dispo[i]; break; } }
+  if (!cible) return;              // deja la 1re/derniere journee
+  // selection manuelle = CETTE journee seule (les puces suivent)
+  prManual = new Set([cible]); prTouched = true;
+  prDates = new Set([cible]);
+  document.querySelectorAll(".prChip").forEach(c =>
+    c.classList.toggle("on", c.textContent === cible));
+  drawProfil();
+  // photo de la journee cible : 1re (glisse gauche) ou derniere
+  // (glisse droite) par horodatage - centrer la carte dessus.
+  let bi = -1, bt = dayDir > 0 ? Infinity : -Infinity;
+  for (let i = 0; i < media.length; i++) {
+    if (media[i].date !== cible) continue;
+    const pt = photoEpoch(media[i]);
+    if (pt === null) continue;
+    if (dayDir > 0 ? pt < bt : pt > bt) { bt = pt; bi = i; }
+  }
+  if (bi >= 0) { openGal(bi); centerActive(); }
+}
+(function () {   // capteurs tactiles sur le panneau alti
+  let sx = 0, sy = 0, st = 0;
+  const pan = document.getElementById("prSvg");
+  pan.addEventListener("touchstart", e => {
+    if (e.touches.length !== 1) { st = 0; return; }
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    st = Date.now();
+  }, { passive: true });
+  pan.addEventListener("touchend", e => {
+    if (!st || !e.changedTouches.length) return;
+    const dx = e.changedTouches[0].clientX - sx;
+    const dy = e.changedTouches[0].clientY - sy;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > 2 * Math.abs(dy)) {
+      lastSwipeT = Date.now();
+      prSwipeDir(dx < 0 ? 1 : -1);   // gauche = suivante, droite = precedente
+    }
+  }, { passive: true });
+})();
 document.getElementById("prSvg").addEventListener("click", e => {
   // v5.22 : en mode direct, le clic sur la courbe = SONDE (heure la
   // plus proche + pointeur sur la carte), pas d'ouverture de photo.
@@ -2487,6 +2546,8 @@ document.getElementById("prSvg").addEventListener("click", e => {
   // v5.24.19 : DOUBLE-TAP sur la courbe = photo la plus proche
   // (+ recentrage carte), sinon recentrage sur la sonde + ecran d'aide.
   if (!prMap) return;
+  // v5.24.20 : glisse horizontal -> NE PAS traiter le clic residuel
+  if (Date.now() - lastSwipeT < 600) return;
   const r0 = e.currentTarget.getBoundingClientRect();
   const gx = e.clientX - r0.left, gy = e.clientY - r0.top;
   const gnow = Date.now();
