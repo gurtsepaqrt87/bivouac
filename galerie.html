@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.18 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.19 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.19 = DOUBLE-TAP ALTI (retour 21/10) : photo la plus proche
+     ouverte + carte RECENTREE sur son marqueur ; si aucune photo a
+     moins de 90 min (journee sans media) : carte recentree sur le
+     POINT JAUNE (sonde) + galerie remplacee par un ECRAN NOIR d'aide
+     (texte jaune : simple clic => suivi horaire ; double clic =>
+     photo la plus proche). Double-tap carte : recentrage + aide
+     aussi (coherence avec v5.24.18).
      v5.24.18 = DOUBLE-TAP TRACE CARTE = PHOTO LA PLUS PROCHE (retour
      21/10) : le simple tap reste la sonde croisee ; le double-tap
      (< 350 ms, < 30 px) sur la trace ouvre la photo a moins de 90 min
@@ -379,6 +386,13 @@
      - meme style que l'heure de la sonde live (noir sur blanc, v5.24.8).
      Positionnee a cote du pin par applySel(), purgee a chaque rendu. */
   .mkhour{position:absolute;z-index:550;font-size:11px;font-weight:700;color:#000;background:#fff;border-radius:6px;padding:2px 5px;box-shadow:0 1px 3px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap;line-height:1.4}
+  /* v5.24.19 : ecran d'aide quand le double-tap n'ouvre AUCUNE photo
+     (journee sans media) - remplace la photo par un ecran noir
+     explicatif, texte jaune. */
+  .probeHelp{display:flex;flex-direction:column;justify-content:center;
+    align-items:center;height:100%;background:#000;color:#ffd60a;
+    font-weight:700;text-align:center;padding:0 12px;line-height:1.9;
+    font-size:15px}
   /* --- contrôles --- */
   #zoom{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:8px;z-index:1000}
     #zoom button{width:52px;height:52px;font-size:26px;font-weight:700;border-radius:12px;border:2px solid #b35300;background:#ff7a00;color:#fff;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
@@ -1118,6 +1132,51 @@ function renderClassicProbe() {
   probeEl.style.top = lat2y(classicProbe.lat, zoom) + "px";
   world.appendChild(probeEl);
 }
+// v5.24.19 : ecran d'aide (noir, texte jaune) - affiche dans la
+// galerie quand un double-tap ne trouve AUCUNE photo (journee sans
+// media). Remplace la photo courante ; la navigation suivante
+// (openGal) la remplace automatiquement.
+function showHelpProbe() {
+  mediaEl.innerHTML =
+    '<div class="probeHelp">'
+    + '<p>simple clic (carte ou altim&eacute;trie) =&gt; Suivi horaire</p>'
+    + '<p>double clic (carte ou altim&eacute;trie) =&gt;'
+    + ' photo la plus &#39;proche&#39;.</p>'
+    + '</div>';
+  document.getElementById("cap").style.display = "none";
+}
+// v5.24.19 : DOUBLE-TAP sur le graphe alti (mode classique) :
+// - photo a moins de 90 min de l'heure cliquee -> l'OUVRIR et
+//   RECENTER la carte sur son marqueur ;
+// - sinon (journee sans media) -> RECENTER la carte sur le point
+//   jaune (sonde) et afficher l'ecran d'aide noir/jaune.
+function graphDoubleTap(x) {
+  if (!prMap || !prMap.blocks.length) return;
+  const u = (x - 42) / (prMap.W - 54) * prMap.Vtot;
+  let blk = null;
+  for (const b of prMap.blocks)
+    if (u >= b.off && u <= b.off + b.dur) { blk = b; break; }
+  if (!blk) return;
+  const t = (blk.t0 + Math.max(0, Math.min(u - blk.off, blk.dur))) / 1000;
+  let bi = -1, bd = Infinity;
+  for (let i = 0; i < media.length; i++) {
+    const pt = photoEpoch(media[i]);
+    if (pt === null) continue;
+    const d = Math.abs(pt / 1000 - t);
+    if (d < bd) { bd = d; bi = i; }
+  }
+  if (bi >= 0 && bd < 90 * 60) {           // photo la plus proche
+    classicProbe = null; renderClassicProbe();
+    openGal(bi);
+    centerActive();                        // recentrage carte sur la photo
+  } else {                                 // aucune photo : sonde + aide
+    if (classicProbe) {
+      clon = classicProbe.lon; clat = classicProbe.lat;
+      render();                            // recentrage sur le point jaune
+    }
+    showHelpProbe();
+  }
+}
 // v5.24.17 : x pixel du graphe -> {t(s), lon, lat} via les times des
 // traces (point le plus proche en TEMPS sur TOUTES les journees).
 function probeFromGraphClassic(x) {
@@ -1170,6 +1229,7 @@ function probeFromGraph(x) {            // tap sur la courbe alti live
 // courbe = photo la plus proche", transplante sur la carte) ; le
 // simple tap reste la sonde croisee.
 let lastMapTapT = 0, lastMapTapX = 0, lastMapTapY = 0;
+let lastGraphTapT = 0, lastGraphTapX = 0, lastGraphTapY = 0;   // v5.24.19
 function openNearestPhotoFromMap(e) {
   const rect = mapEl.getBoundingClientRect();
   const mx = e.clientX - rect.left + ox;
@@ -1181,7 +1241,7 @@ function openNearestPhotoFromMap(e) {
     for (let i = 0; i < cs.length && i < ts.length; i++) {
       const d = Math.hypot(lon2x(cs[i][0], zoom) - mx,
                            lat2y(cs[i][1], zoom) - my);
-      if (d < bd) { bd = d; best = ts[i]; }
+      if (d < bd) { bd = d; best = { t: ts[i], lon: cs[i][0], lat: cs[i][1] }; }
     }
   }
   if (best == null || bd >= 24) return false;
@@ -1191,14 +1251,18 @@ function openNearestPhotoFromMap(e) {
   for (let i = 0; i < media.length; i++) {
     const pt = photoEpoch(media[i]);
     if (pt === null) continue;
-    const d = Math.abs(pt / 1000 - best);
+    const d = Math.abs(pt / 1000 - best.t);
     if (d < bdt) { bdt = d; bi = i; }
   }
   if (bi >= 0 && bdt < 90 * 60) {
     classicProbe = null; renderClassicProbe();
     openGal(bi);
+    centerActive();                  // v5.24.19 : recentrage sur la photo
   } else {
-    console.log("Double-tap : aucune photo a moins de 90 min.");
+    // v5.24.19 : aucune photo -> recentrer sur le point tape + aide
+    clon = best.lon; clat = best.lat;
+    render();
+    showHelpProbe();
   }
   return true;
 }
@@ -2420,9 +2484,20 @@ document.getElementById("prSvg").addEventListener("click", e => {
   // valable aussi pour une journee SANS media (l'ancien curseur photo
   // restait fige au debut de journee). L'ancien comportement (ouvrir
   // la photo la plus proche) est REMPLACE par la sonde.
+  // v5.24.19 : DOUBLE-TAP sur la courbe = photo la plus proche
+  // (+ recentrage carte), sinon recentrage sur la sonde + ecran d'aide.
   if (!prMap) return;
   const r0 = e.currentTarget.getBoundingClientRect();
-  probeFromGraphClassic(e.clientX - r0.left);
+  const gx = e.clientX - r0.left, gy = e.clientY - r0.top;
+  const gnow = Date.now();
+  if (gnow - lastGraphTapT < 350
+      && Math.hypot(gx - lastGraphTapX, gy - lastGraphTapY) < 30) {
+    graphDoubleTap(gx);
+    lastGraphTapT = 0;
+    return;
+  }
+  lastGraphTapT = gnow; lastGraphTapX = gx; lastGraphTapY = gy;
+  probeFromGraphClassic(gx);
 });
 document.getElementById("btProfil").onclick = toggleProfil;
 document.getElementById("btSat").onclick = () => setVue(vue === "sat" ? "plan" : "sat");   // v5.19
