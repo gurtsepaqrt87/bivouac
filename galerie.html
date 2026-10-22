@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.26 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.27 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.27 = FIX ZOOM MOLETTE laptop (retour 21/10) : le recentrage
+     apres zoom utilisait clientHeight/2 alors que render() centre a
+     (clientHeight - profH)/2 (compensation panneau alti) -> chaque
+     coup de molette a alti ouverte glissait la vue vers le sud.
+     profH est desormais GLOBALE (partagee entre render et le handler
+     molette - elle etait locale et invisible a ce dernier).
      v5.24.26 = FIX BOUTON ALTI 1F CARTE (retour 21/10) : le masquage
      v5.24.22 etait trop large - en vue 1F CARTE le ⛰ de la pile
      zoom doit rester visible pour basculer en 2F carte+alti ; il
@@ -796,6 +802,11 @@ const errEl = document.getElementById("err");
 
 let zoom = 11, clon = -1.85, clat = 48.15;   // centre initial (cadrage auto ensuite)
 let ox = 0, oy = 0;
+// v5.24.27 : hauteur du panneau alti PARTAGEE (etait locale a render)
+// - le zoom molette en a besoin pour respecter la meme convention de
+// centrage vertical : sans elle, chaque coup de molette (alti ouverte)
+// declenchait un glissement de profH/2 px vers le sud (retour 21/10).
+let profH = 0;
 let media = [], marks = [], traces = [];
 let mkHourEl = null;   // v5.24.9 : pastille heure du marqueur actif
 let classicProbe = null; // v5.24.17 : sonde classique {t(s), lon, lat} - v5.24.17
@@ -1418,7 +1429,10 @@ function render() {
   // 1F carte+alti, ou overlay laptop), centrer dans la zone VISIBLE
   // au-dessus du panneau - sinon le pointeur actif est centre dans le
   // conteneur ENTIER et parait decale vers le bas ("comme en 2F").
-  let profH = 0;
+  // v5.24.27 : plus de declaration locale - profH est desormais la
+  // VARIABLE GLOBALE (partagee avec le zoom molette) ; profH = 0 ici
+  // reinitialise a chaque rendu.
+  profH = 0;
   // v5.16.5 : test DOM (pas la variable profilOn, declaree PLUS BAS
   // dans le script : render() est appele AVANT sa declaration a
   // l'initialisation -> ReferenceError TDZ qui tuait TOUTE la page :
@@ -1587,7 +1601,11 @@ mapEl.addEventListener("wheel", e => {
   const newOx = px2 - mx, newOy = py2 - my; // origine monde desiree
   // centre final correspondant a cette origine :
   clon = px2lon(newOx + mapEl.clientWidth / 2);
-  clat = py2lat(newOy + mapEl.clientHeight / 2);
+  // v5.24.27 : convention de centrage verticale IDENTIQUE a render() -
+  // (clientHeight - profH) / 2 et non clientHeight / 2 : sans le terme
+  // profH (panneau alti ouvert), chaque zoom molette glissait la vue
+  // de profH/2 px vers le sud (retour 21/10).
+  clat = py2lat(newOy + (mapEl.clientHeight - profH) / 2);
   render();
 }, { passive: false });
 document.getElementById("zin").onclick = () => { if (zoom < ZMAX) { zoom++; render(); } };
