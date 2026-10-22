@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.20 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.21 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.21 = (1) ALTI SMARTPHONE : 3+ journees -> dates jj/mm
+     (regle unifiee ; avant 5+) ; 1-2 journees -> date jj/mm au
+     bas-centre au-dessus des heures (9 px, #8a94b0). (2) 1F :
+     bouton alti CACHE (bouton carte conserve ; reste accessible si
+     l'alti 1F est ouverte). (3) FIX laptop : troncature du HAUT
+     de la fenetre alti (echelle de temps invisible) - hauteur
+     CACHEE desormais bornee par la zone visible, comme la mesure.
      v5.24.20 = GLISSE HORIZONTAL ALTI (smartphone, retour 21/10) :
      gauche = journee suivante (graphe seul + 1re photo + carte
      centree), droite = journee precedente (+ DERNIERE photo +
@@ -398,6 +405,10 @@
     align-items:center;height:100%;background:#000;color:#ffd60a;
     font-weight:700;text-align:center;padding:0 12px;line-height:1.9;
     font-size:15px}
+  /* v5.24.21 : smartphone, vue 1F - bouton ALTI cache (pas utile en
+     plein ecran photo ; le bouton CARTE reste) */
+  #wrap.single #btProfil{display:none}
+  #wrap.single.showprofil #btProfil{display:block}   /* 1F alti ouverte : reste accessible */
   /* --- contrôles --- */
   #zoom{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:8px;z-index:1000}
     #zoom button{width:52px;height:52px;font-size:26px;font-weight:700;border-radius:12px;border:2px solid #b35300;background:#ff7a00;color:#fff;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
@@ -2144,6 +2155,14 @@ function drawProfil(full) {
   let H, W;
   if (modeKey === lastPrMode && lastPrH > 0 && lastPrW > 0) {
     H = lastPrH; W = lastPrW;
+    // v5.24.21 : FIX troncature HAUT (laptop, retour 21/10) - la
+    // hauteur CACHEE du mode pouvait DEPASSER la zone visible (pane
+    // plus haut que l'ecran utile : haut du graphe et ECHELLE DE
+    // TEMPS en haut coupes). La borne v5.24.16 n'etait appliquee
+    // qu'au chemin MESURE ; ici, chemin CACHE, on borne pareil.
+    const wrapRc = document.getElementById("prWrap").getBoundingClientRect();
+    H = Math.max(60, Math.min(H, Math.round(wrapRc.height)));
+    W = Math.max(120, W);
   } else {
     H = Math.round(rPan.height) - chipsH - 12;
     // v5.16.8 : borne aussi par le HAUT - si le panneau (absolute,
@@ -2316,18 +2335,18 @@ function drawProfilContent(svg, W, H) {
     }
   }
   // v5.20/v5.21 : ECHELLE TEMPORELLE ADAPTATIVE.
-  // v5.21 : granularité plus fine ET differenciee MOBILE / laptop :
-  //  - smartphone (etiquettes TOUJOURS en bas, ne varient plus) :
-  //    1 journée -> 1 h ; 2 -> 2 h ; 3-4 -> 6 h (>= 2 repères/jour).
+  // v5.24.21 (retour 21/10, smartphone) : AU-DELA DE 2 journees on
+  // affiche DESormais les DATES jj/mm (etait 5+) - la regle unifiee :
+  // 1-2 journees -> heures (1 h / 2 h) + DATE jj/mm au bas-centre
+  // de CHAQUE journee (meme taille/couleur que les heures) ;
+  // 3 journees et plus -> dates jj/mm seules (format 5+ conserve).
   //  - laptop (fenêtre large, placement dynamique conserve haut/bas
-  //    selon où vit la courbe) : 1 journée -> 30 min ; 2 -> 1 h ;
-  //    3-4 -> 2 h.
-  //  - 5+ journées -> uniquement la DATE (JJ/MM, sans année).
+  //    selon où vit la courbe) : 1 journée -> 30 min ; 2 -> 1 h.
   // Police 9 px discrete, micro-tirets, anti-collision 36 px.
   const nbJ = blocks.length;
   const stepH = MOBILE
-    ? (nbJ === 1 ? 1 : nbJ === 2 ? 2 : nbJ <= 4 ? 6 : 0)
-    : (nbJ === 1 ? 0.5 : nbJ === 2 ? 1 : nbJ <= 4 ? 2 : 0);
+    ? (nbJ === 1 ? 1 : nbJ === 2 ? 2 : 0)
+    : (nbJ === 1 ? 0.5 : nbJ === 2 ? 1 : 0);
   let topN = 0, botN = 0;
   const emid = (emin + emax) / 2;
   for (const b of blocks) for (const p of b.pts) (p[1] >= emid ? topN++ : botN++);
@@ -2362,7 +2381,21 @@ function drawProfilContent(svg, W, H) {
                  ? dt.getHours() + " h " + dt.getMinutes()
                  : dt.getHours() + " h");
       }
-    } else {                               // dates seules (5+ journees)
+      // v5.24.21 : smartphone, 1-2 journees -> DATE jj/mm au
+      // BAS-CENTRE de la journee, juste AU-DESSUS de l'echelle des
+      // heures (meme taille 9 px, meme couleur #8a94b0).
+      if (MOBILE) {
+        const dc = document.createElementNS(NSVG, "text");
+        dc.setAttribute("x", X(b.t0 + (b.t1 - b.t0) / 2));
+        dc.setAttribute("y", tY - 12);      // au-dessus des heures
+        dc.setAttribute("fill", "#8a94b0");
+        dc.setAttribute("font-size", "9");
+        dc.setAttribute("text-anchor", "middle");
+        dc.textContent = new Date(b.t0).toLocaleDateString("fr-FR",
+          { day: "2-digit", month: "2-digit" });
+        svg.appendChild(dc);
+      }
+    } else {                               // dates seules (3+ journees)
       mkTick(b.t0 + (b.t1 - b.t0) / 2,
              new Date(b.t0).toLocaleDateString("fr-FR",
                { day: "2-digit", month: "2-digit" }));
