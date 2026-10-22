@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.27 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.28 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.28 = ZOOM MOLETTE ANCRE POINTEUR ACTIF (retour 21/10) :
+     l'ancre du zoom = pointeur de la photo AFFICHEE (ou sonde jaune
+     si journee sans media), PLUS la position de la souris ; a defaut
+     d'ancre, zoom centre simple.
      v5.24.27 = FIX ZOOM MOLETTE laptop (retour 21/10) : le recentrage
      apres zoom utilisait clientHeight/2 alors que render() centre a
      (clientHeight - profH)/2 (compensation panneau alti) -> chaque
@@ -1583,28 +1587,31 @@ mapEl.addEventListener("pointerup", endPointer);
 mapEl.addEventListener("pointercancel", endPointer);
 let lastDrag = 0;
 mapEl.addEventListener("dblclick", () => { if (zoom < ZMAX) { zoom++; render(); } });
-// zoom molette : centre sur le point du curseur (sens Google Maps :
-// molette haut = zoom in, molette bas = zoom out)
+// zoom molette (retour 21/10, v5.24.28) : ancre = POINTEUR ACTIF de
+// la photo affichee ; si aucun media (journee sans photo), ancre =
+// SONDE JAUNE (classicProbe) ; a defaut, zoom centre simple. La
+// position de la SOURIS n'entre plus en jeu : zoome depuis le sud
+// de la carte ne devait pas tirer la vue vers le sud.
 mapEl.addEventListener("wheel", e => {
   e.preventDefault();
   const dir = e.deltaY < 0 ? 1 : -1;
   if ((dir > 0 && zoom >= ZMAX) || (dir < 0 && zoom <= ZMIN)) return;
-  // garder le point sous le curseur fixe : coordonnees avant/apres
-  const rect = mapEl.getBoundingClientRect();
-  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-  const px = ox + mx, py = oy + my;         // position monde du curseur
-  clon = px2lon(px); clat = py2lat(py);     // centre provisoire = curseur
+  // 1. determiner l'ANCRE (pointeur photo active, sinon sonde)
+  let aLon = null, aLat = null;
+  const m = media[sel];
+  if (m && m.lat != null) { aLon = m.lon; aLat = m.lat; }
+  else if (classicProbe) { aLon = classicProbe.lon; aLat = classicProbe.lat; }
+  if (aLon == null) { zoom += dir; render(); return; }  // pas d'ancre
+  // 2. position ECRAN actuelle de l'ancre (avant zoom)
+  const sx = lon2x(aLon, zoom) - ox;
+  const sy = lat2y(aLat, zoom) - oy;
+  // 3. apres zoom, origine monde pour que l'ancre reste en (sx, sy)
   zoom += dir;
-  render();
-  // recentrer pour que le point curseur reste a l'ecran ou il etait :
-  const px2 = lon2x(clon, zoom), py2 = lat2y(clat, zoom);
-  const newOx = px2 - mx, newOy = py2 - my; // origine monde desiree
-  // centre final correspondant a cette origine :
+  const newOx = lon2x(aLon, zoom) - sx;
+  const newOy = lat2y(aLat, zoom) - sy;
+  // 4. centre correspondant - MEME convention de centrage que render
+  // (v5.24.27 : compensation profH du panneau alti)
   clon = px2lon(newOx + mapEl.clientWidth / 2);
-  // v5.24.27 : convention de centrage verticale IDENTIQUE a render() -
-  // (clientHeight - profH) / 2 et non clientHeight / 2 : sans le terme
-  // profH (panneau alti ouvert), chaque zoom molette glissait la vue
-  // de profH/2 px vers le sud (retour 21/10).
   clat = py2lat(newOy + (mapEl.clientHeight - profH) / 2);
   render();
 }, { passive: false });
