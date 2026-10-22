@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.39 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.40 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.40 = FILM D'ACCUEIL (retour 21/10, smartphone ET laptop) :
+     pendant l'affichage de la page d'accueil, lecture TEMPORELLE
+     RAPIDE - le curseur photo balaie tout le voyage (carte centree
+     + alti suivent), cadence = voyage complet dans les 12 s ; si la
+     page est figee, le balayage boucle jusqu'a la sortie.
      v5.24.39 = CADRE de lecture continue (retour 21/10) : liseré
      jaune sur les contours de la fenetre photo tant que la lecture
      defile (smartphone ET laptop), retire des l'arret (tap/clic,
@@ -3074,6 +3079,7 @@ async function load() {
       // graph de sa date, selections purgees).
       showHomePage(false);
       fitAllDays();
+      homePlaybackStart();          // v5.24.40 : film d'accueil
       const allDatesM = profilData ? Object.keys(profilData.dates) : [];
       if (allDatesM.length) {
         prManual = new Set(allDatesM);
@@ -3091,6 +3097,7 @@ async function load() {
       centerActive();
       showHomePage(true);
       fitAllDays();
+      homePlaybackStart();          // v5.24.40 : film d'accueil
       const allDates = profilData ? Object.keys(profilData.dates) : [];
       if (allDates.length) {
         prManual = new Set(allDates);
@@ -3157,7 +3164,31 @@ function dismissHome() {
   document.getElementById("homeP").remove();
   clearTimeout(homeTimer);
   homeFrozen = false;             // v5.24.34 : reinitialiser le gel
+  homePlaybackStop();             // v5.24.40 : couper le film d'accueil
   restoreNominal();
+}
+// v5.24.40 : LECTURE TEMPORELLE RAPIDE pendant l'accueil (retour
+// 21/10, smartphone ET laptop) : le curseur photo balaie TOUT le
+// voyage a vitesse rapide - la carte suit (centrage) et l'alti
+// affiche le curseur au fil des heures. Cadence : le voyage entier
+// tient dans les 12 s du timer (sauts de plusieurs photos par
+// tick 300 ms - plus fluide qu'un defile photo par photo sur
+// smartphone) ; si la page est FIGEE (1er tap/clic), le balayage
+// CONTINUE en boucle jusqu'a la sortie de l'accueil.
+let homePlay = null;
+function homePlaybackStart() {
+  if (homePlay || !media.length) return;
+  const pas = Math.max(1, Math.ceil(media.length / 40));  // ~40 ticks / 12 s
+  homePlay = setInterval(() => {
+    if (!document.getElementById("homeP")) { homePlaybackStop(); return; }
+    let i = sel + pas;
+    if (i >= media.length) i = 0;                         // boucle (page figee)
+    openGal(i);          // curseur : carte + alti suivent (galerie couverte)
+    centerActive();
+  }, 300);
+}
+function homePlaybackStop() {
+  if (homePlay) { clearInterval(homePlay); homePlay = null; }
 }
 // v5.24.37 : retour au MODE CLASSIQUE apres l'accueil (laptop comme
 // mobile) - 1re photo de la journee la plus RECENTE ayant un media,
