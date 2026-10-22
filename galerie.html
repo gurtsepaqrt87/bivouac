@@ -1,6 +1,17 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.16 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.18 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.18 = DOUBLE-TAP TRACE CARTE = PHOTO LA PLUS PROCHE (retour
+     21/10) : le simple tap reste la sonde croisee ; le double-tap
+     (< 350 ms, < 30 px) sur la trace ouvre la photo a moins de 90 min
+     de l'heure du point tape (regle historique du clic courbe).
+     v5.24.17 = SONDE CROISEE CLASSIQUE (retour 21/10) : tap sur la
+     courbe alti OU sur la trace carte -> curseur jaune pointille dans
+     le graphe + point jaune (heure sur pastille noire/blanche) sur la
+     carte, valable aussi pour une journee SANS media. Necessite
+     trace.geojson avec "times" (build_daily v5.2.45 + reprocess).
+     L'ancien "clic courbe = ouvrir la photo la plus proche" est
+     remplace par la sonde.
      v5.24.16 = ALTI LAPTOP (retour 21/10) : (1) FIX troncature bas de
      courbe a la selection d'une date - le tracé complet n'etait pas
      borne par la hauteur VISIBLE (borne v5.16.19 appliquee au seul
@@ -723,6 +734,7 @@ let zoom = 11, clon = -1.85, clat = 48.15;   // centre initial (cadrage auto ens
 let ox = 0, oy = 0;
 let media = [], marks = [], traces = [];
 let mkHourEl = null;   // v5.24.9 : pastille heure du marqueur actif
+let classicProbe = null; // v5.24.17 : sonde classique {t(s), lon, lat} - v5.24.17
 // v5.17 : live (position gpslogger du jour, poussee par live.py)
 let live = null, liveTrace = [], liveEl = null, liveSeen = false;   // v5.24 : liveSeen = 1er clic sur le bouton Direct
 // v5.17.1 : km par journee (profil.json "km", charge au boot)
@@ -1093,6 +1105,41 @@ function showCyclist() {
   // objet en mode direct (le cycliste n'a ni nom ni date ni comm.).
   document.getElementById("cap").style.display = "none";
 }
+// v5.24.17 : SONDE CROISEE CLASSIQUE - meme presentation que la sonde
+// live (heure noire sur pastille blanche + point jaune) mais pilotee
+// par classicProbe (le tap courbe alti ou trace carte la deplace).
+function renderClassicProbe() {
+  if (probeEl) { probeEl.remove(); probeEl = null; }
+  if (liveMode || !classicProbe) return;
+  probeEl = document.createElement("div");
+  probeEl.id = "mkprobe";
+  probeEl.innerHTML = '<div class="h">' + fmtH(classicProbe.t) + '</div><div class="d"></div>';
+  probeEl.style.left = lon2x(classicProbe.lon, zoom) + "px";
+  probeEl.style.top = lat2y(classicProbe.lat, zoom) + "px";
+  world.appendChild(probeEl);
+}
+// v5.24.17 : x pixel du graphe -> {t(s), lon, lat} via les times des
+// traces (point le plus proche en TEMPS sur TOUTES les journees).
+function probeFromGraphClassic(x) {
+  if (!prMap || !prMap.blocks.length) return;
+  const u = (x - 42) / (prMap.W - 54) * prMap.Vtot;
+  let blk = null;
+  for (const b of prMap.blocks)
+    if (u >= b.off && u <= b.off + b.dur) { blk = b; break; }
+  if (!blk) blk = prMap.blocks[u < prMap.blocks[0].off
+                              ? 0 : prMap.blocks.length - 1];
+  const t = (blk.t0 + Math.max(0, Math.min(u - blk.off, blk.dur))) / 1000;
+  let best = null, bd = Infinity;
+  for (const tr of traces) {
+    const ts = tr.times; if (!ts) continue;
+    const cs = tr.geometry.coordinates;
+    for (let i = 0; i < ts.length && i < cs.length; i++) {
+      const d = Math.abs(ts[i] - t);
+      if (d < bd) { bd = d; best = { t: ts[i], lon: cs[i][0], lat: cs[i][1] }; }
+    }
+  }
+  if (best) { classicProbe = best; drawProfil(); renderClassicProbe(); }
+}
 // sonde carte<->profil : point tape (trace ou courbe) + heure la plus proche
 function renderLiveProbe() {
   if (probeEl) { probeEl.remove(); probeEl = null; }
@@ -1115,7 +1162,80 @@ function probeFromGraph(x) {            // tap sur la courbe alti live
   }
   if (best) { liveProbe = best; drawProfil(); renderLiveProbe(); }
 }
+// v5.24.17 : tap sur la trace en MODE CLASSIQUE -> sonde : point de
+// trace (avec times) le plus proche en DISTANCE ECRAN (< 24 px),
+// meme regle que le live ; le curseur jaune de la fenetre alti suit.
+// v5.24.18 : DOUBLE-TAP sur la trace -> ouvrir la photo la plus
+// proche de l'heure du point tape (l'ancien comportement "clic
+// courbe = photo la plus proche", transplante sur la carte) ; le
+// simple tap reste la sonde croisee.
+let lastMapTapT = 0, lastMapTapX = 0, lastMapTapY = 0;
+function openNearestPhotoFromMap(e) {
+  const rect = mapEl.getBoundingClientRect();
+  const mx = e.clientX - rect.left + ox;
+  const my = e.clientY - rect.top + oy;
+  let best = null, bd = Infinity;
+  for (const tr of traces) {
+    const ts = tr.times; if (!ts) continue;
+    const cs = tr.geometry.coordinates;
+    for (let i = 0; i < cs.length && i < ts.length; i++) {
+      const d = Math.hypot(lon2x(cs[i][0], zoom) - mx,
+                           lat2y(cs[i][1], zoom) - my);
+      if (d < bd) { bd = d; best = ts[i]; }
+    }
+  }
+  if (best == null || bd >= 24) return false;
+  // photo la plus proche en TEMPS du point tape (regle historique :
+  // ouverte seulement si a moins de 90 min du trace)
+  let bi = -1, bdt = Infinity;
+  for (let i = 0; i < media.length; i++) {
+    const pt = photoEpoch(media[i]);
+    if (pt === null) continue;
+    const d = Math.abs(pt / 1000 - best);
+    if (d < bdt) { bdt = d; bi = i; }
+  }
+  if (bi >= 0 && bdt < 90 * 60) {
+    classicProbe = null; renderClassicProbe();
+    openGal(bi);
+  } else {
+    console.log("Double-tap : aucune photo a moins de 90 min.");
+  }
+  return true;
+}
+function classicProbeFromMap(e) {
+  if (!profilOn || !traces.length || Date.now() - lastDrag < 400) return;
+  // v5.24.18 : DOUBLE-TAP (< 350 ms, < 30 px d'ecart) -> photo
+  const now = Date.now();
+  const rect0 = mapEl.getBoundingClientRect();
+  const x0 = e.clientX - rect0.left, y0 = e.clientY - rect0.top;
+  if (now - lastMapTapT < 350
+      && Math.hypot(x0 - lastMapTapX, y0 - lastMapTapY) < 30) {
+    openNearestPhotoFromMap(e);
+    lastMapTapT = 0;
+    return;
+  }
+  lastMapTapT = now; lastMapTapX = x0; lastMapTapY = y0;
+  const rect = mapEl.getBoundingClientRect();
+  const mx = e.clientX - rect.left + ox;
+  const my = e.clientY - rect.top + oy;
+  let best = null, bd = Infinity;
+  for (const tr of traces) {
+    const ts = tr.times; if (!ts) continue;
+    const cs = tr.geometry.coordinates;
+    for (let i = 0; i < cs.length && i < ts.length; i++) {
+      const d = Math.hypot(lon2x(cs[i][0], zoom) - mx,
+                           lat2y(cs[i][1], zoom) - my);
+      if (d < bd) { bd = d; best = { t: ts[i], lon: cs[i][0], lat: cs[i][1] }; }
+    }
+  }
+  if (best && bd < 24) {
+    classicProbe = best; drawProfil(false); renderClassicProbe();
+  }
+}
 mapEl.addEventListener("click", e => {  // tap sur la trace live (carte)
+  // v5.24.17 : en MODE CLASSIQUE, tap pres de la trace = sonde ;
+  // en mode direct, comportement live inchangé.
+  if (!liveMode) { classicProbeFromMap(e); return; }
   if (!liveMode || !livePts.length || Date.now() - lastDrag < 400) return;
   const mx = e.clientX - mapEl.getBoundingClientRect().left + ox;
   const my = e.clientY - mapEl.getBoundingClientRect().top + oy;
@@ -1197,7 +1317,7 @@ function render() {
   ox = lon2x(clon, zoom) - mapEl.clientWidth / 2;
   oy = lat2y(clat, zoom) - (mapEl.clientHeight - profH) / 2;
   world.style.transform = "translate(" + (-ox) + "px," + (-oy) + "px)";
-  renderTiles(); renderTraces(); renderMarkers(); renderLive(); renderLiveProbe(); updateKmDay();
+  renderTiles(); renderTraces(); renderMarkers(); renderLive(); renderLiveProbe(); renderClassicProbe(); updateKmDay();
   // v5.17 : trace LIVE du jour en pointilles gris, SOUS les cumuls
   if (liveValid() && liveTrace.length) {
     // v5.22.2 : id DEDIE + purge de l'ancien calque - chaque render()
@@ -2206,9 +2326,32 @@ function drawProfilContent(svg, W, H) {
 }
 function profilCursor() {
   if (liveMode) return;              // v5.22 : en direct, curseurs live/sonde only
-  if (!profilOn || !prMap || !media[sel]) return;
+  // v5.24.17 : la SONDE classique se dessine MEME sans media (journee
+  // gpx sans photo : l'ancien return figeait tout au debut de journee).
+  if (!profilOn || !prMap) return;
   const svg = document.getElementById("prSvg");
   svg.querySelectorAll(".prCur").forEach(x => x.remove());
+  // v5.24.17 : CURSEUR SONDE (jaune) - position cliquee sur la courbe
+  // ou sur la trace carte. Independant du curseur photo.
+  if (classicProbe) {
+    let pb = null;
+    for (const b of prMap.blocks)
+      if (classicProbe.t * 1000 >= b.t0 && classicProbe.t * 1000 <= b.t1)
+        { pb = b; break; }
+    if (pb) {
+      const px = 42 + (pb.off + (classicProbe.t * 1000 - pb.t0))
+                 / prMap.Vtot * (prMap.W - 54);
+      const pl = document.createElementNS(NSVG, "line");
+      pl.setAttribute("class", "prCur");
+      pl.setAttribute("x1", px); pl.setAttribute("x2", px);
+      pl.setAttribute("y1", 4); pl.setAttribute("y2", prMap.Y(prMap.emin));
+      pl.setAttribute("stroke", "#ffd60a");
+      pl.setAttribute("stroke-width", "2");
+      pl.setAttribute("stroke-dasharray", "5 4");   // distingue du curseur photo
+      svg.appendChild(pl);
+    }
+  }
+  if (!media[sel]) return;           // journee sans media : sonde seule
   const t = photoEpoch(media[sel]);
   if (t === null) return;
   // v5.14.2 : journee la plus PROCHE, puis position bornee aux bornes
@@ -2272,24 +2415,14 @@ document.getElementById("prSvg").addEventListener("click", e => {
     probeFromGraph(e.clientX - r.left);
     return;
   }
-  // clic inverse : ouvrir la photo la plus proche de l'horodatage clique
-  // v5.14.1 : px -> position sur l'axe virtuel contigu -> journee + heure
+  // v5.24.17 : en MODE CLASSIQUE, le clic sur la courbe = SONDE
+  // CROISEE (curseur jaune deplace + point jaune sur la carte),
+  // valable aussi pour une journee SANS media (l'ancien curseur photo
+  // restait fige au debut de journee). L'ancien comportement (ouvrir
+  // la photo la plus proche) est REMPLACE par la sonde.
   if (!prMap) return;
-  const r = e.currentTarget.getBoundingClientRect();
-  const u = ((e.clientX - r.left) - 42) / (r.width - 54) * prMap.Vtot;
-  let blk = null;
-  for (const b of prMap.blocks)
-    if (u >= b.off && u <= b.off + b.dur) { blk = b; break; }
-  if (!blk) return;
-  const t = blk.t0 + (u - blk.off);
-  let best = -1, bd = Infinity;
-  for (let i = 0; i < media.length; i++) {
-    const pt = photoEpoch(media[i]);
-    if (pt === null) continue;
-    const d = Math.abs(pt - t);
-    if (d < bd) { bd = d; best = i; }
-  }
-  if (best >= 0 && bd < 90 * 60 * 1000) openGal(best);   // sinon : clic trop loin de toute photo
+  const r0 = e.currentTarget.getBoundingClientRect();
+  probeFromGraphClassic(e.clientX - r0.left);
 });
 document.getElementById("btProfil").onclick = toggleProfil;
 document.getElementById("btSat").onclick = () => setVue(vue === "sat" ? "plan" : "sat");   // v5.19
@@ -2459,6 +2592,10 @@ async function load() {
     media.sort((a, b) => (a.date + "|" + a.name).localeCompare(b.date + "|" + b.name));
     media.forEach((m, i) => m.i = i);
     try { traces = (await fetchJ("trace.geojson")).features || []; } catch (e) { traces = []; }
+    // v5.24.17 : TIMES embarques par trace.geojson (build_daily v5.2.45)
+    // - necessaires a la sonde croisee classique (carte <-> profil).
+    for (const t of traces)
+      if (t.properties && t.properties.times) t.times = t.properties.times;
     // v5.17.1 : profil.json au BOOT pour le badge km (variable kmData
     // dediee : le panneau alti garde son chargement differe profilData
     // et la construction de ses puces de dates).
