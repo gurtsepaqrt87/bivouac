@@ -1,6 +1,16 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.28 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.30 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.30 = SONDE : tap courbe CENTRE la carte sur le point jaune
+     (retour 21/10, journee sans media : la sonde etait posee hors
+     champ) ; zoom molette : la SONDE prime sur la photo affichee
+     (l'ancre restait une photo d'une autre journee, incoherent).
+     v5.24.29 = FIX GLISSE ALTI (retour 21/10) : la reference du
+     glisse = le GRAPHE alti (selection en cours), pas la photo
+     affichee - cas : 21/10 sans media selectionnee, photo du 13/10
+     affichee -> le glisse sautait du 13/10 au 12/10 ; desormais il
+     part du 21/10 (solo) ; multi-selection -> extremite dans le sens
+     du glisse ; graphe vide -> photo (repli).
      v5.24.28 = ZOOM MOLETTE ANCRE POINTEUR ACTIF (retour 21/10) :
      l'ancre du zoom = pointeur de la photo AFFICHEE (ou sonde jaune
      si journee sans media), PLUS la position de la souris ; a defaut
@@ -1262,7 +1272,17 @@ function probeFromGraphClassic(x) {
       if (d < bd) { bd = d; best = { t: ts[i], lon: cs[i][0], lat: cs[i][1] }; }
     }
   }
-  if (best) { classicProbe = best; drawProfil(); renderClassicProbe(); }
+  if (best) {
+    classicProbe = best;
+    // v5.24.30 (retour 21/10) : le tap COURBE CENTRE la carte sur la
+    // sonde - cas : journee sans media (ecran noir d'aide), la photo
+    // restee affichee en galerie appartient a une AUTRE journee : la
+    // sonde etait posee mais hors champ, invisible sans deplacement
+    // manuel. render() recentre ET redessine le point jaune.
+    clon = best.lon; clat = best.lat;
+    drawProfil(false);
+    render();
+  }
 }
 // sonde carte<->profil : point tape (trace ou courbe) + heure la plus proche
 function renderLiveProbe() {
@@ -1596,11 +1616,16 @@ mapEl.addEventListener("wheel", e => {
   e.preventDefault();
   const dir = e.deltaY < 0 ? 1 : -1;
   if ((dir > 0 && zoom >= ZMAX) || (dir < 0 && zoom <= ZMIN)) return;
-  // 1. determiner l'ANCRE (pointeur photo active, sinon sonde)
+  // 1. determiner l'ANCRE - v5.24.30 (retour 21/10) : la SONDE
+  // prime sur la photo : posee par un tap explicite, c'est l'objet
+  // que l'utilisateur regarde (cas reel : journee 21/10 sans media,
+  // photo du 13/10 encore active en galerie -> l'ancre restait la
+  // photo, incoherent avec le point jaune affiche). Sans sonde :
+  // pointeur photo ; sinon zoom centre.
   let aLon = null, aLat = null;
-  const m = media[sel];
-  if (m && m.lat != null) { aLon = m.lon; aLat = m.lat; }
-  else if (classicProbe) { aLon = classicProbe.lon; aLat = classicProbe.lat; }
+  if (classicProbe) { aLon = classicProbe.lon; aLat = classicProbe.lat; }
+  else { const m = media[sel];
+         if (m && m.lat != null) { aLon = m.lon; aLat = m.lat; } }
   if (aLon == null) { zoom += dir; render(); return; }  // pas d'ancre
   // 2. position ECRAN actuelle de l'ancre (avant zoom)
   const sx = lon2x(aLon, zoom) - ox;
@@ -2617,15 +2642,26 @@ function profilCursor() {
 // glisse vers la GAUCHE -> journee SUIVANTE (graphe seul sur cette
 // journee + 1re photo de la journee ouverte + carte centree) ;
 // glisse vers la DROITE -> journee PRECEDENTE (+ DERNIERE photo de
-// la journee + carte centree). Reference = date de la photo affichee
-// (sinon derniere date selectionnee). Journees sans media : le graphe
-// bascule, la galerie garde la photo courante (pas de media a ouvrir).
+// la journee + carte centree).
+// v5.24.29 (retour 21/10) : la REFERENCE n'est plus la photo affichee
+// mais le GRAPHE ALTI lui-meme. Cas reel : 21/10 (sans media) selec-
+// tionnee dans l'alti, galerie sur une photo du 13/10 -> le glisse
+// partait du 13/10 (photo) et sautait au 12/10 au lieu du 13/10
+// attendu. Desormais : selection SOLO -> cette date ; selection
+// MULTIPLE -> l'EXTREMITE dans le sens du glisse (suivant = apres la
+// plus RECENTE, precedent = avant la plus ANCIENNE) ; graphe vide ->
+// photo affichee (ancien comportement, repli).
 let lastSwipeT = 0;
 function prSwipeDir(dayDir) {
   if (!profilData || !profilData.dates) return;
   const dispo = Object.keys(profilData.dates).sort();
   if (!dispo.length) return;
-  const ref = (media[sel] && media[sel].date) || null;
+  let ref = null;
+  if (prDates.size === 1) ref = [...prDates][0];       // cas nominal
+  else if (prDates.size > 1)
+    ref = dayDir > 0 ? [...prDates].sort().pop()       // la plus recente
+                     : [...prDates].sort()[0];         // la plus ancienne
+  else ref = (media[sel] && media[sel].date) || null;  // repli : photo
   if (!ref) return;
   let cible = null;
   if (dayDir > 0) { for (const d of dispo) if (d > ref) { cible = d; break; } }
