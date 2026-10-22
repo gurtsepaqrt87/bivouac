@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.35 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.36 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.36 = MODE LAPTOP (retour 21/10) : alti ACTIVEE par defaut
+     au refresh ; PAGE D'ACCUEIL 'version laptop' dans la galerie
+     (1er clic fige / 2nd clic quitte / 12 s - contenu distinct) ;
+     LECTURE CONTINUE laptop : clic photo = on/off (4 s/photo) ;
+     carte no-media remplacee par l'accueil LAPTOP.
      v5.24.35 = LECTURE CONTINUE : 4 s par photo (etait 2 s).
      v5.24.34 = ACCUEIL + LECTURE CONTINUE (retour 21/10) : accueil
      smartphone 1 tap FIGE (cadre jaune) / 2 tap QUITTE / expiration
@@ -1246,6 +1251,20 @@ function renderClassicProbe() {
 // affiche cycliste + guide DANS la galerie quand le double-tap ne
 // trouve AUCUNE photo (journee sans media). Remplace la photo
 // courante ; la navigation suivante (openGal) la remplace.
+// v5.24.36 : guide ACCUEIL LAPTOP (retour 21/10) - contenu distinct
+// de la version smartphone (pas de glisses : souris/clavier).
+function homeGuideLaptopHTML() {
+  return '<div class="guide">'
+    + '<b>Accueil</b> : 1er clic pour figer, 2nd clic pour quitter la page<br>'
+    + '<b>Galerie</b> : s&eacute;lection des dates avec le bouton<br>'
+    + '&nbsp;&nbsp;D&eacute;fil&eacute; manuel avec les fl&egrave;ches gauche/droite<br>'
+    + '&nbsp;&nbsp;Lecture continue (on/off) suite aux clics sur les photos<br>'
+    + '<b>Carte</b> : zoom avec les boutons +/&#8722; ou avec la molette de la souris<br>'
+    + '<b>Carte ou altim&eacute;trie</b> :<br>'
+    + '&nbsp;&nbsp;Simple clic : suivi horaire<br>'
+    + '&nbsp;&nbsp;Double clic : affiche la photo la plus proche'
+    + '</div>';
+}
 function homeGuideHTML() {
   return '<div class="guide">'
     // v5.24.34 : guide mis a jour (figer/quitter, lecture continue)
@@ -1263,8 +1282,10 @@ function homeGuideHTML() {
     + '</div>';
 }
 function showHomeCard() {
+  // v5.24.36 : guide LAPTOP sur laptop, smartphone sinon
   mediaEl.innerHTML =
-    '<div class="homeCard">' + homeCyclistSVG() + homeGuideHTML() + '</div>';
+    '<div class="homeCard">' + homeCyclistSVG()
+    + (MOBILE ? homeGuideHTML() : homeGuideLaptopHTML()) + '</div>';
   document.getElementById("cap").style.display = "none";
 }
 // v5.24.19 : DOUBLE-TAP sur le graphe alti (mode classique) :
@@ -2917,8 +2938,9 @@ mediaEl.addEventListener("pointerup", e => {
   // avec un appui sur les commandes video, ni avec un scroll vertical)
   if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5)
     { autoStop(); openGal(dx < 0 ? sel + 1 : sel - 1); }   // glisse a gauche => suivant
-  // v5.24.34 : TAP immobile (hors video/boutons) = On/Off lecture
-  else if (MOBILE && Math.abs(dx) < 12 && Math.abs(dy) < 12
+  // v5.24.34/36 : TAP immobile (hors video/boutons) = On/Off lecture
+  // - smartphone ET laptop (retour 21/10 : clic photo laptop = on/off)
+  else if (Math.abs(dx) < 12 && Math.abs(dy) < 12
            && !e.target.closest("video,button,a,select"))
     autoToggle();
 });
@@ -3028,11 +3050,16 @@ async function load() {
       // 1 tap ou 10 s -> retour nominal (photo + centrage + graph).
       // Le nominal (photo recente ouverte + alti) est deja en place
       // derriere l'ecran d'accueil : le retour est immediat.
-      showHomePage();
+      showHomePage(false);
       fitAllDays();
       chipsFlash(10000);
     } else {
+      // v5.24.36 (retour 21/10) : LAPTOP - alti ACTIVEE par defaut au
+      // rafraichissement + PAGE D'ACCUEIL 'version laptop' dans la
+      // galerie : 1er clic fige, 2nd clic quitte, 12 s sinon.
+      await openProfil();
       centerActive();
+      showHomePage(true);
     }
   } catch (e) { fail(e.message); }
 }
@@ -3100,14 +3127,14 @@ function dismissHome() {
   }
   centerActive();
 }
-function showHomePage() {
+function showHomePage(laptop) {
   if (document.getElementById("homeP")) return;
   homeSaved = { zoom: zoom, lon: clon, lat: clat };
   const d = document.createElement("div");
   d.id = "homeP";
-  // v5.24.33 : borne a la FENETRE DU HAUT (#side = galerie +
-  // commentaires) - la carte et les puces restent visibles.
-  d.innerHTML = homeCyclistSVG() + homeGuideHTML();
+  // v5.24.36 : guide distinct LAPTOP / smartphone
+  d.innerHTML = homeCyclistSVG()
+    + (laptop ? homeGuideLaptopHTML() : homeGuideHTML());
   // v5.24.34 (retour 21/10) : 1 tap FIGE (arret du compte a rebours),
   // 2 tap QUITTE ; expiration 12 s.
   d.onclick = () => {
