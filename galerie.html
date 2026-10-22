@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.38 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.39 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.39 = CADRE de lecture continue (retour 21/10) : liseré
+     jaune sur les contours de la fenetre photo tant que la lecture
+     defile (smartphone ET laptop), retire des l'arret (tap/clic,
+     glisse, fin de galerie, mode direct).
      v5.24.38 = ACCUEIL SMARTPHONE : alti en vue TOUTES JOURNEES
      connues pendant l'accueil (au lieu des puces seules) - meme
      panorama que le laptop v5.24.37 ; retour nominal inchange.
@@ -505,6 +509,9 @@
   #homeP .guide b,.homeCard .guide b{color:#ffd60a;font-weight:700}
   #homeP svg{height:86px;max-width:220px}
   #homeP.frozen{outline:3px solid #ffd60a;outline-offset:-3px}   /* fige */
+  /* v5.24.39 : cadre de LECTURE CONTINUE - liseré jaune discret sur
+     les contours de la fenetre photo, tant que la lecture defile */
+  #media.autoOn{outline:3px solid #ffd60a;outline-offset:-3px}
   /* v5.24.33 : accueil en REMPLACEMENT DE L'ECRAN NOIR (double-tap
      sans media, laptop) - meme contenu, sans timer ni centrage */
   .homeCard{display:flex;flex-direction:column;justify-content:center;
@@ -2925,11 +2932,17 @@ new ResizeObserver(entries => {
 // curseur photo au fil des photos). S'arrete a la DERNIERE photo ou
 // si un glisse/video prend la main ; glisse = navigation manuelle.
 let autoTimer = null;
+// v5.24.39 : CADRE visible pendant la lecture continue (retour
+// 21/10) - liseré jaune sur les contours de la fenetre photo,
+// pose/retire avec la lecture, smartphone ET laptop.
+function autoFrame(on) { mediaEl.classList.toggle("autoOn", !!on); }
 function autoStop() {
   if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  autoFrame(false);
 }
 function autoToggle() {
   if (autoTimer) { autoStop(); return; }   // deja en lecture -> arret
+  autoFrame(true);
   autoTimer = setInterval(() => {
     if (liveMode || sel >= media.length - 1) { autoStop(); return; }
     openGal(sel + 1);
