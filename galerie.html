@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.32 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.33 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.33 = ACCUEIL AFFINE (retour 21/10) : smartphone - borne a
+     la FENETRE DU HAUT (carte + puces visibles dessous) ; laptop -
+     double-tap sans media = page d'ACCUEIL (cycliste + guide) en
+     remplacement de la page noire.
      v5.24.32 = PAGE D'ACCUEIL smartphone (retour 21/10) : 10 s au
      refresh - cycliste voyageur (sacoches) + guide des gestes, carte
      DEZOOMEE sur toutes les journees (fitAllDays), puces de dates
@@ -460,10 +464,7 @@
   /* v5.24.19 : ecran d'aide quand le double-tap n'ouvre AUCUNE photo
      (journee sans media) - remplace la photo par un ecran noir
      explicatif, texte jaune. */
-  .probeHelp{display:flex;flex-direction:column;justify-content:center;
-    align-items:center;height:100%;background:#000;color:#ffd60a;
-    font-weight:700;text-align:center;padding:0 12px;line-height:1.9;
-    font-size:15px}
+  /* v5.24.19 obsolete (remplacee par .homeCard v5.24.33) */
   /* v5.24.26 : smartphone, vue 1F - boutons ALTI caches UNIQUEMENT en
   vue 1F PHOTO (:not(.showmap)) - la v5.24.22 masquait aussi le ⛰ de
   la pile zoom en vue 1F CARTE, ou il est necessaire pour basculer
@@ -473,15 +474,23 @@
   #wrap.single.alti #btProfil, #wrap.single.alti #hdAlti,
   #wrap.single.showprofil #btProfil, #wrap.single.showprofil #hdAlti
     {display:flex}
-  /* v5.24.32 : PAGE D'ACCUEIL smartphone (10 s au refresh, 1 tap =
-     quitter) - cycliste voyageur + guide, par-dessus TOUT l'ecran */
+  /* v5.24.32/33 : PAGE D'ACCUEIL smartphone (10 s au refresh, 1 tap =
+     quitter) - v5.24.33 : borne a la FENETRE DU HAUT (galerie +
+     commentaires) : carte et puces alti restent visibles dessous */
+  #side{position:relative}
   #homeP{position:absolute;inset:0;z-index:1700;background:#0d1117f8;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     padding:16px;text-align:center;gap:10px;cursor:pointer}
-  #homeP .guide{color:#8a94b0;font-size:13.5px;line-height:1.75;
-    text-align:left;max-width:340px}
-  #homeP .guide b{color:#ffd60a;font-weight:700}
+  #homeP .guide,.homeCard .guide{color:#8a94b0;font-size:13.5px;
+    line-height:1.75;text-align:left;max-width:340px}
+  #homeP .guide b,.homeCard .guide b{color:#ffd60a;font-weight:700}
   #homeP svg{height:86px;max-width:220px}
+  /* v5.24.33 : accueil en REMPLACEMENT DE L'ECRAN NOIR (double-tap
+     sans media, laptop) - meme contenu, sans timer ni centrage */
+  .homeCard{display:flex;flex-direction:column;justify-content:center;
+    align-items:center;height:100%;background:#0d1117;padding:10px;
+    gap:8px;text-align:center}
+  .homeCard svg{height:64px;max-width:180px}
   /* --- contrôles --- */
   #zoom{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:8px;z-index:1000}
     #zoom button{width:52px;height:52px;font-size:26px;font-weight:700;border-radius:12px;border:2px solid #b35300;background:#ff7a00;color:#fff;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
@@ -1226,17 +1235,26 @@ function renderClassicProbe() {
   probeEl.style.top = lat2y(classicProbe.lat, zoom) + "px";
   world.appendChild(probeEl);
 }
-// v5.24.19 : ecran d'aide (noir, texte jaune) - affiche dans la
-// galerie quand un double-tap ne trouve AUCUNE photo (journee sans
-// media). Remplace la photo courante ; la navigation suivante
-// (openGal) la remplace automatiquement.
-function showHelpProbe() {
-  mediaEl.innerHTML =
-    '<div class="probeHelp">'
-    + '<p>simple clic (carte ou altim&eacute;trie) =&gt; Suivi horaire</p>'
-    + '<p>double clic (carte ou altim&eacute;trie) =&gt;'
-    + ' photo la plus &#39;proche&#39;.</p>'
+// v5.24.33 : ACCUEIL en remplacement de la page NOIRE (retour 21/10) -
+// affiche cycliste + guide DANS la galerie quand le double-tap ne
+// trouve AUCUNE photo (journee sans media). Remplace la photo
+// courante ; la navigation suivante (openGal) la remplace.
+function homeGuideHTML() {
+  return '<div class="guide">'
+    + '<b>Accueil</b> : 1 tap pour quitter la page<br>'
+    + '<b>Galerie</b> : d&eacute;filement des photos au gliss&eacute; droite/gauche<br>'
+    + '<b>Carte ou altim&eacute;trie</b> :<br>'
+    + '&nbsp;&nbsp;Simple tap : suivi horaire parcours/alti<br>'
+    + '&nbsp;&nbsp;Double tap : affiche la photo la plus proche<br>'
+    + '<b>Altim&eacute;trie</b> :<br>'
+    + '&nbsp;&nbsp;Gliss&eacute; gauche : vers la journ&eacute;e suivante<br>'
+    + '&nbsp;&nbsp;Gliss&eacute; droite : vers la journ&eacute;e pr&eacute;c&eacute;dente<br>'
+    + '<b>Bascule des fen&ecirc;tres</b> : 3F &lt;&gt; 2F &lt;&gt; 1F'
     + '</div>';
+}
+function showHomeCard() {
+  mediaEl.innerHTML =
+    '<div class="homeCard">' + homeCyclistSVG() + homeGuideHTML() + '</div>';
   document.getElementById("cap").style.display = "none";
 }
 // v5.24.19 : DOUBLE-TAP sur le graphe alti (mode classique) :
@@ -1268,7 +1286,7 @@ function graphDoubleTap(x) {
       clon = classicProbe.lon; clat = classicProbe.lat;
       render();                            // recentrage sur le point jaune
     }
-    showHelpProbe();
+    showHomeCard();
   }
 }
 // v5.24.17 : x pixel du graphe -> {t(s), lon, lat} via les times des
@@ -1366,7 +1384,7 @@ function openNearestPhotoFromMap(e) {
     // v5.24.19 : aucune photo -> recentrer sur le point tape + aide
     clon = best.lon; clat = best.lat;
     render();
-    showHelpProbe();
+    showHomeCard();
   }
   return true;
 }
@@ -3055,20 +3073,11 @@ function showHomePage() {
   homeSaved = { zoom: zoom, lon: clon, lat: clat };
   const d = document.createElement("div");
   d.id = "homeP";
-  d.innerHTML = homeCyclistSVG()
-    + '<div class="guide">'
-    + '<b>Accueil</b> : 1 tap pour quitter la page<br>'
-    + '<b>Galerie</b> : d&eacute;filement des photos au gliss&eacute; droite/gauche<br>'
-    + '<b>Carte ou altim&eacute;trie</b> :<br>'
-    + '&nbsp;&nbsp;Simple tap : suivi horaire parcours/alti<br>'
-    + '&nbsp;&nbsp;Double tap : affiche la photo la plus proche<br>'
-    + '<b>Altim&eacute;trie</b> :<br>'
-    + '&nbsp;&nbsp;Gliss&eacute; gauche : vers la journ&eacute;e suivante<br>'
-    + '&nbsp;&nbsp;Gliss&eacute; droite : vers la journ&eacute;e pr&eacute;c&eacute;dente<br>'
-    + '<b>Bascule des fen&ecirc;tres</b> : 3F &lt;&gt; 2F &lt;&gt; 1F'
-    + '</div>';
+  // v5.24.33 : borne a la FENETRE DU HAUT (#side = galerie +
+  // commentaires) - la carte et les puces restent visibles.
+  d.innerHTML = homeCyclistSVG() + homeGuideHTML();
   d.onclick = () => dismissHome();
-  wrapEl.appendChild(d);
+  document.getElementById("side").appendChild(d);
   homeTimer = setTimeout(dismissHome, 10000);
 }
 // v5.17 : polling du live toutes les 30 s (cache-busting comme photos.csv)
