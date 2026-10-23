@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.41 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.42 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.42 = (retour 21/10) BUG 1 : sync alti a la transition
+     J -> J+1 - la date photo est AJOUTEE a la selection (solo :
+     elle suit la journee ; multiple : la journee s'y ajoute),
+     le graphe ne reste plus bloque sur la veille ; BUG 2 :
+     grammaire des taps - 1 tap = On/Off, 2 = cadence +1 s,
+     3 = -1 s (borne 1..10 s, pastille de retour, lecture relancee
+     a la nouvelle cadence), smartphone ET laptop ; guides a jour.
      v5.24.41 = FILM D'ACCUEIL + CADRE DATE (retour 21/10) : le
      balayage temporel attend 3 s (vue d'ensemble) puis boucle le
      voyage en 9 s, et CONTINUE tant que l'accueil reste affiche ;
@@ -520,6 +527,13 @@
   #homeP .guide b,.homeCard .guide b{color:#ffd60a;font-weight:700}
   #homeP svg{height:86px;max-width:220px}
   #homeP.frozen{outline:3px solid #ffd60a;outline-offset:-3px}   /* fige */
+  /* v5.24.42 : pastille CADENCE de lecture (retour 1/2/3 taps) */
+  #autoToast{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    z-index:400;background:#1c2230;color:#ffd60a;font-weight:700;font-size:16px;
+    padding:6px 14px;border-radius:10px;border:1px solid #ffd60a;
+    opacity:0;pointer-events:none}
+  #autoToast.pop{animation:autoToastA .9s ease}
+  @keyframes autoToastA{0%{opacity:0}15%{opacity:1}80%{opacity:1}100%{opacity:0}}
   /* v5.24.39 : cadre de LECTURE CONTINUE - liseré jaune discret sur
      les contours de la fenetre photo, tant que la lecture defile */
   #media.autoOn{outline:3px solid #ffd60a;outline-offset:-3px}
@@ -1284,7 +1298,8 @@ function homeGuideLaptopHTML() {
     + '<b>Accueil</b> : 1er clic pour figer, 2nd clic pour quitter la page<br>'
     + '<b>Galerie</b> : s&eacute;lection des dates avec le bouton<br>'
     + '&nbsp;&nbsp;D&eacute;fil&eacute; manuel avec les fl&egrave;ches gauche/droite<br>'
-    + '&nbsp;&nbsp;Lecture continue (on/off) suite aux clics sur les photos<br>'
+    + '&nbsp;&nbsp;Lecture continue : clic = On/Off ; double clic = +1 s ;'
+    + ' triple clic = &minus;1 s<br>'
     + '<b>Carte</b> : zoom avec les boutons +/&#8722; ou avec la molette de la souris<br>'
     + '<b>Carte ou altim&eacute;trie</b> :<br>'
     + '&nbsp;&nbsp;Simple clic : suivi horaire<br>'
@@ -1298,6 +1313,7 @@ function homeGuideHTML() {
     + '<b>Galerie</b> : gliss&eacute; droite/gauche pour d&eacute;filement'
     + ' manuel<br>'
     + '&nbsp;&nbsp;tap : On/Off de la lecture continue<br>'
+    + '&nbsp;&nbsp;double tap : cadence +1 s ; triple tap : &minus;1 s<br>'
     + '<b>Carte ou altim&eacute;trie</b> :<br>'
     + '&nbsp;&nbsp;Simple tap : suivi horaire parcours/alti<br>'
     + '&nbsp;&nbsp;Double tap : affiche la photo la plus proche<br>'
@@ -1796,8 +1812,25 @@ function enablePan(el) {
 
 function openGal(i) {
   if (!media.length) return;
+  const prevDate = media[sel] ? media[sel].date : null;
   sel = Math.max(0, Math.min(media.length - 1, i));
   const m = media[sel];
+  // v5.24.42 (retour 21/10, bug 1) : SYNC TEMPORELLE ALTI A LA
+  // TRANSITION J -> J+1 : quand la photo passe a une journee ABSENTE
+  // de la selection, on l'AJOUTE (meme si puces touchees) - le
+  // graphe suit galerie/carte au lieu de rester bloque sur la
+  // veille. Les selections manuelles sont conservees (jamais
+  // retirees) ; la journee precedente reste affichee : contexte.
+  if (profilOn && prevDate !== m.date && profilData
+      && profilData.dates[m.date] && !prDates.has(m.date)) {
+    // selection SOLO -> elle SUIT la journee (reste solo) ;
+    // selection MULTIPLE -> la nouvelle journee s'y AJOUTE.
+    if (prManual.size === 1 && prManual.has(prevDate))
+      prManual.delete(prevDate);
+    prManual.add(m.date);
+    prTouched = true;
+    syncPrDates(); drawProfil();
+  }
   mediaEl.innerHTML = "";
   let el;
   if (m.type === "video") {
@@ -2943,6 +2976,7 @@ new ResizeObserver(entries => {
 // curseur photo au fil des photos). S'arrete a la DERNIERE photo ou
 // si un glisse/video prend la main ; glisse = navigation manuelle.
 let autoTimer = null;
+let autoDelay = 4000;   // v5.24.42 : cadence reglable (1..10 s)
 // v5.24.39/41 : CADRE de lecture continue - liseré sur les contours
 // de la fenetre photo. v5.24.41 : la couleur n'est plus le jaune
 // fixe mais la COULEUR DE LA DATE affichee (celle des marqueurs
@@ -2961,15 +2995,53 @@ function autoStop() {
   if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
   autoFrame(false);
 }
+function autoStep() {               // un pas de lecture
+  if (liveMode || sel >= media.length - 1) { autoStop(); return; }
+  openGal(sel + 1);
+  centerActive();          // suivi horaire : carte centree + alti
+  autoFrameSync();         // v5.24.41 : couleur du cadre = date
+}
+function autoStart() {
+  autoFrame(true);
+  autoStep();               // v5.24.42 : demarrage immediat
+  autoTimer = setInterval(autoStep, autoDelay);
+}
 function autoToggle() {
   if (autoTimer) { autoStop(); return; }   // deja en lecture -> arret
-  autoFrame(true);
-  autoTimer = setInterval(() => {
-    if (liveMode || sel >= media.length - 1) { autoStop(); return; }
-    openGal(sel + 1);
-    centerActive();          // suivi horaire : carte centree + alti
-    autoFrameSync();         // v5.24.41 : couleur du cadre = date
-  }, 4000);   // v5.24.35 : 4 s par photo (retour 21/10 - etait 2 s)
+  autoStart();
+}
+// v5.24.42 : reglage de la CADENCE avec retour visuel ephemere
+// (pastille "4 s" au centre de la fenetre photo, 900 ms).
+function autoToast() {
+  let t = document.getElementById("autoToast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "autoToast";
+    mediaEl.appendChild(t);
+  }
+  t.textContent = "\u23f1 " + (autoDelay / 1000) + " s";
+  t.classList.remove("pop"); void t.offsetWidth; t.classList.add("pop");
+}
+function autoSetDelay(d) {
+  autoDelay = Math.max(1000, Math.min(10000, autoDelay + d * 1000));
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = setInterval(autoStep, autoDelay); }
+  autoToast();
+}
+// v5.24.42 (retour 21/10, bug 2) : GRAMMAIRE DES TAPS sur la galerie
+// (smartphone ET laptop) : 1 tap/clic = On/Off ; 2 = cadence +1 s ;
+// 3 = cadence -1 s. Comptage : apres le 1er et le 2e tap, on attend
+// 380 ms - s'il n'en vient pas d'autre, l'action est jouee ; un 3e
+// tap dans la fenetre joue immediatement -1 s.
+let tapCount = 0, tapTimer = null;
+function tapTally() {
+  tapCount++;
+  clearTimeout(tapTimer);
+  if (tapCount >= 3) { tapCount = 0; autoSetDelay(-1); return; }
+  tapTimer = setTimeout(() => {
+    const n = tapCount; tapCount = 0;
+    if (n === 1) autoToggle();
+    else autoSetDelay(+1);
+  }, 380);
 }
 let swipe = null;
 mediaEl.addEventListener("pointerdown", e => { swipe = { x: e.clientX, y: e.clientY }; });
@@ -2981,11 +3053,12 @@ mediaEl.addEventListener("pointerup", e => {
   // avec un appui sur les commandes video, ni avec un scroll vertical)
   if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5)
     { autoStop(); openGal(dx < 0 ? sel + 1 : sel - 1); }   // glisse a gauche => suivant
-  // v5.24.34/36 : TAP immobile (hors video/boutons) = On/Off lecture
-  // - smartphone ET laptop (retour 21/10 : clic photo laptop = on/off)
+  // v5.24.34/42 : TAP immobile (hors video/boutons) = grammaire
+  // lecture auto - 1 tap = On/Off, 2 = +1 s, 3 = -1 s
+  // (smartphone ET laptop - retour 21/10 : clic photo laptop idem)
   else if (Math.abs(dx) < 12 && Math.abs(dy) < 12
            && !e.target.closest("video,button,a,select"))
-    autoToggle();
+    tapTally();
 });
 // ---------- poignee de redimensionnement galerie <-> carte ----------
 const splitEl = document.getElementById("split");
