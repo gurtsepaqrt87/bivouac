@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.42 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.43 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.43 = FIX ADMIN COMMENTAIRE (retour 21/10) : encodage base64
+     PAR MORCEAUX (4096) - le spread String.fromCharCode(...bytes)
+     explosait la limite d'arguments du moteur JS quand photos.csv
+     depassait ~65 Ko ("Maximum call stack size exceeded").
      v5.24.42 = (retour 21/10) BUG 1 : sync alti a la transition
      J -> J+1 - la date photo est AJOUTEE a la selection (solo :
      elle suit la journee ; multiple : la journee s'y ajoute),
@@ -1985,7 +1989,17 @@ document.getElementById("admSave").onclick = async () => {
     if (!hit) throw new Error("ligne introuvable dans photos.csv");
     // 3. commit via l'API (seul photos.csv est republie - pas les medias)
     const body = lines.join("\n") + "\n";
-    const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(body)));
+    // v5.24.43 : ENCODAGE PAR MORCEAUX - le spread
+    // String.fromCharCode(...bytes) passait CHAQUE octet du CSV en
+    // argument de fonction ; photos.csv a grandi (14 journees) et a
+    // depasse la limite d'arguments du moteur (~65 000) ->
+    // "Maximum call stack size exceeded" au moindre enregistrement.
+    // Paquets de 4096 : independant de la taille du fichier.
+    const enc8 = new TextEncoder().encode(body);
+    let bin = "";
+    for (let i8 = 0; i8 < enc8.length; i8 += 4096)
+      bin += String.fromCharCode.apply(null, enc8.subarray(i8, i8 + 4096));
+    const b64 = btoa(bin);
     const p = await fetch("https://api.github.com/repos/" + REPO + "/contents/photos.csv", {
       method: "PUT",
       headers: { Authorization: "Bearer " + ADM, Accept: "application/vnd.github+json" },
