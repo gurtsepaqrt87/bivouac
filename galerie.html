@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.44 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.45 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.45 = VUE ADMIN AFFINEE (retour du 24/10) : lecture
+     automatique DESACTIVEE en admin ; centrage AUTOMATIQUE de la
+     carte sur le pointeur photo a chaque navigation ; hauteur de
+     la fenetre photo garantee en admin (min-height - la zone
+     d'actions l'ecrasait vers zero).
      v5.24.44 = MODE ADMIN ACTIONS (retour 21/10) : pas d'accueil ni
      d'alti en admin (2F galerie+carte) ; zone d'actions par photo -
      supprimer / pivoter 90-180-270 / ajuster GPS (clic carte) ;
@@ -627,6 +632,11 @@
   /* zone admin (visible uniquement en mode #adm=) : saisie commentaire */
   #admBox{padding:8px 12px;border-top:1px solid #26304a;display:none;flex-direction:column;gap:6px}
   #admBox.on{display:flex}
+  /* v5.24.45 : en vue ADMIN la fenetre photo garde une HAUTEUR
+     GARANTIE - la zone d'actions (commentaire + cases + liste +
+     boutons) poussait #media (flex:1, min-height:0) vers des
+     hauteurs quasi nulles (retour du 24/10). */
+  #side.adminmode #media{min-height:300px}
   /* =========== ADAPTATION SMARTPHONE ===========
      REGLE D'OR : cette section est en FIN de feuille car, a specificite
      egale, la DERNIERE regle du source gagne - placee avant les regles
@@ -1879,6 +1889,11 @@ function openGal(i) {
     prTouched = true;
     syncPrDates(); drawProfil();
   }
+  // v5.24.45 (retour du 24/10) : en VUE ADMIN, centrage AUTOMATIQUE
+  // de la carte sur le pointeur de la photo affichee a chaque
+  // navigation (flches, glisse, markers) - la zone d'actions travaill
+  // toujours sur la photo vue.
+  if (ADM) centerActive();
   mediaEl.innerHTML = "";
   let el;
   if (m.type === "video") {
@@ -1996,7 +2011,11 @@ async function loadComments() {
 // v5.24.15 : ADM aussi via URLSearchParams (meme fragment, cle "adm")
 // - l'ancien format #adm=<token> reste compatible.
 const ADM = H.get("adm") || null;
-if (ADM) document.getElementById("admBox").classList.add("on");
+if (ADM) {
+  document.getElementById("admBox").classList.add("on");
+  // v5.24.45 : hauteur photo garantee en admin (cf. CSS .adminmode)
+  document.getElementById("side").classList.add("adminmode");
+}
 document.getElementById("admSave").onclick = async () => {
   const btn = document.getElementById("admSave"), m = media[sel];
   if (!m) return;
@@ -3208,9 +3227,10 @@ mediaEl.addEventListener("pointerup", e => {
     { autoStop(); openGal(dx < 0 ? sel + 1 : sel - 1); }   // glisse a gauche => suivant
   // v5.24.34/42 : TAP immobile (hors video/boutons) = grammaire
   // lecture auto - 1 tap = On/Off, 2 = +1 s, 3 = -1 s
-  // (smartphone ET laptop - retour 21/10 : clic photo laptop idem)
+  // v5.24.45 : DESACTIVE EN VUE ADMIN (retour du 24/10) - pas de
+  // lecture automatique en admin.
   else if (Math.abs(dx) < 12 && Math.abs(dy) < 12
-           && !e.target.closest("video,button,a,select"))
+           && !e.target.closest("video,button,a,select") && !ADM)
     tapTally();
 });
 // ---------- poignee de redimensionnement galerie <-> carte ----------
