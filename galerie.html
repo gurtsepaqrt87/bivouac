@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.24.45 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.24.46 : chercher "v5.24" (Ctrl+U, Ctrl+F).
+     v5.24.46 = ADMIN (retour du 24/10) : bouton "💾 Commentaires"
+     (libelle raccourci, l'icone suffit).
      v5.24.45 = VUE ADMIN AFFINEE (retour du 24/10) : lecture
      automatique DESACTIVEE en admin ; centrage AUTOMATIQUE de la
      carte sur le pointeur photo a chaque navigation ; hauteur de
@@ -855,7 +857,7 @@
       </div>
       <div id="admPending"></div>
       <div id="admBtns">
-        <button class="nav" id="admSave">💾 Enregistrer commentaire</button>
+        <button class="nav" id="admSave">💾 Commentaires</button>
         <button class="nav" id="admAct">➕ Valider action</button>
         <button class="nav" id="admExec">⚡ Exécuter actions</button>
       </div>
@@ -2021,7 +2023,7 @@ document.getElementById("admSave").onclick = async () => {
   if (!m) return;
   if (!ADM || !REPO) {   // diagnostiquer au lieu de quitter silencieusement
     btn.textContent = "✖ Mode admin indisponible (token ou REPO manquant)";
-    setTimeout(() => btn.textContent = "💾 Enregistrer", 4000);
+    setTimeout(() => btn.textContent = "💾 Commentaires", 4000);
     return;
   }
   const txt = document.getElementById("admTxt").value.trim();
@@ -2076,7 +2078,7 @@ document.getElementById("admSave").onclick = async () => {
     c.textContent = txt; c.classList.toggle("on", !!txt);
     btn.textContent = "✔ Enregistré";
   } catch (e) { btn.textContent = "✖ Erreur : " + e.message; }
-  setTimeout(() => btn.textContent = "💾 Enregistrer", 3000);
+  setTimeout(() => btn.textContent = "💾 Commentaires", 3000);
 };
 
 // ---------- v5.24.44 : ACTIONS ADMIN (fichier de commandes) ----------
