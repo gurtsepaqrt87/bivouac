@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="fr">
 <!-- VERSION v5.25.1 : chercher "v5.25" (Ctrl+U, Ctrl+F).
+     v5.25.2 = FIX 3F ECRASEE (retour 31/10) : la branche .alti (2F
+     photo+alti) pose des styles INLINE sur le panneau photo
+     (flex:none + height:px, portrait -> photo ~78% ecran, voulu en
+     v5.16.31) - AUCUNE branche ne les purgeait : de retour en 3F, la
+     photo gardait sa hauteur inline, la carte tombait a ~20% et
+     l'alti 3F (40% de la carte) a ~9% d'ecran. drawProfil purge
+     desormais ces styles AVANT les branches, SAUF en .alti (qui les
+     recalcule). Le plancher 22% en 2F photo+alti portrait est
+     CONSERVE (comportement voulu : photo plein ecran + glisser).
      v5.25.1 = ZOOM ANCRE SUR LE POINT VERT EN MODE DIRECT (retour du
      28/10) : les boutons + / - faisaient zoom++; render() SANS ancre
      (le zoom molette avait deja une ancre sonde > photo, mais ni
@@ -2640,6 +2649,17 @@ function drawProfil(full) {
   // (le calcul unique etait contournable selon le chemin suivi :
   // 1F alti -> 2F -> 3F laissait une alti tronquee ; les redessins
   // differes rAF/150 ms appliquent la meme logique et auto-corrigent).
+  // v5.25.2 : PURGE des styles INLINE du panneau photo laisses par un
+  // passage en .alti (flex:none + height:...px). Sans cette purge,
+  // ils persistaient dans TOUS les autres modes : en 3F la photo
+  // gardait sa hauteur du mode alti (portrait -> ~78% ecran) et la
+  // carte, donc l alti (40% de la carte), etait ecrasee. La branche
+  // .alti ci-dessous les REPOSA apres ce reset - comportement du
+  // mode photo+alti inchange (retour terrain du 31/10).
+  if (!wrapEl.classList.contains("alti")) {
+    side.style.flex = "";
+    side.style.height = "";
+  }
   if (wrapEl.classList.contains("single")) {
     pan.style.flex = ""; pan.style.marginTop = "";   // v5.16.23 : retablir le flux
     pan.style.height = (wrapEl.classList.contains("showmap")
