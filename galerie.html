@@ -1,6 +1,19 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.25.4 : chercher "v5.25" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.25.5 : chercher "v5.25" (Ctrl+U, Ctrl+F).
+     v5.25.5 = RETOURS 04/11 : (1) BOOT RAPIDE - photos, videos,
+     traces, profil et commentaires charges EN PARALLELE (avant :
+     5 allers-retours sequentiels -> la page d accueil n apparais-
+     sait qu apres leur somme). (2) GUIDE : "Accueil :" en JAUNE
+     (#ffd60a, classe gAccueil), le reste de la ligne ("1 tap pour
+     figer, 2 tap pour quitter") reste en VERT CLAIR (#7CFC00,
+     classe gFreeze). (3) PLAYER : vitesse UNIFORME - le curseur
+     avance d une DISTANCE constante par tick (distance cumulee
+     homePlayCum, ~15 s pour tout le voyage) ; avant, le pas
+     etait un nombre de POINTS fixe : les traces peu denses (1er
+     voyage) defilaient trop vite, les denses (voyages suivants)
+     trop lentement. Sauts entre voyages (> 5 km) exclus du cumul.
+     v5.25.4 = RETOURS 03/11 : (1) la ligne "Accueil : 1 tap pour
      v5.25.4 = RETOURS 03/11 : (1) la ligne "Accueil : 1 tap pour
      figer, 2 tap pour quitter la page" (et sa version laptop
      "1er/2nd clic") passe en VERT CLAIR (#7CFC00, classe gFreeze)
@@ -659,6 +672,8 @@
      03/11 - le jaune etait peu visible). Les autres libelles
      restent jaunes. */
   #homeP .guide b.gFreeze{color:#7CFC00}
+  /* v5.25.5 : "Accueil :" en JAUNE, le reste de la ligne en vert */
+  #homeP .guide b.gAccueil{color:#ffd60a}
   #homeP svg{height:86px;max-width:220px}
   #homeP.frozen{outline:3px solid #ffd60a;outline-offset:-3px}   /* fige */
   /* v5.24.42 : pastille CADENCE de lecture (retour 1/2/3 taps) */
@@ -1517,7 +1532,7 @@ function renderClassicProbe() {
 // de la version smartphone (pas de glisses : souris/clavier).
 function homeGuideLaptopHTML() {
   return '<div class="guide">'
-    + '<b class="gFreeze">Accueil : 1er clic pour figer, 2nd clic pour quitter la page</b><br>'
+    + '<b class="gAccueil">Accueil :</b> <b class="gFreeze">1er clic pour figer, 2nd clic pour quitter la page</b><br>'
     + '<b>Galerie</b> : s&eacute;lection des dates avec le bouton<br>'
     + '&nbsp;&nbsp;D&eacute;fil&eacute; manuel avec les fl&egrave;ches gauche/droite<br>'
     + '&nbsp;&nbsp;Lecture continue : clic = On/Off ; double clic = +1 s ;'
@@ -1531,7 +1546,7 @@ function homeGuideLaptopHTML() {
 function homeGuideHTML() {
   return '<div class="guide">'
     // v5.24.34 : guide mis a jour (figer/quitter, lecture continue)
-    + '<b class="gFreeze">Accueil : 1 tap pour figer, 2 tap pour quitter la page</b><br>'
+    + '<b class="gAccueil">Accueil :</b> <b class="gFreeze">1 tap pour figer, 2 tap pour quitter la page</b><br>'
     + '<b>Galerie</b> : gliss&eacute; droite/gauche pour d&eacute;filement'
     + ' manuel<br>'
     + '&nbsp;&nbsp;tap : On/Off de la lecture continue<br>'
@@ -3519,8 +3534,17 @@ function fail(msg) { errEl.textContent = "Erreur de chargement : " + msg; errEl.
 async function load() {
   try {
     media = [];
-    for (const [f, type] of [["photos.geojson", "photo"], ["videos.geojson", "video"]]) {
-      let j; try { j = await fetchJ(f); } catch (e) { if (type === "video") continue; throw e; }
+    // v5.25.5 : BOOT RAPIDE - photos, videos, traces, profil et
+    // commentaires lances EN PARALLELE des le debut du chargement
+    // (avant : 5 allers-retours sequentiels retardaient l accueil).
+    const tracePr = fetchJ("trace.geojson").catch(() => ({ features: [] }));
+    const profilPr = fetch(BASE + "/profil.json?v=" + Date.now())
+                     .then(r => r.json()).catch(() => null);
+    const comPr = loadComments().catch(() => {});
+    const phJ = await fetchJ("photos.geojson");
+    const vJ = await fetchJ("videos.geojson").catch(() => null);
+    for (const [j, type] of [[phJ, "photo"], [vJ, "video"]]) {
+      if (!j) continue;
       for (const ft of (j.features || [])) {
         const p = ft.properties || {};
         media.push({
@@ -3537,7 +3561,7 @@ async function load() {
     }
     media.sort((a, b) => (a.date + "|" + a.name).localeCompare(b.date + "|" + b.name));
     media.forEach((m, i) => m.i = i);
-    try { traces = (await fetchJ("trace.geojson")).features || []; } catch (e) { traces = []; }
+    traces = (await tracePr).features || [];   // v5.25.5 : fetch parallele lance plus haut
     // v5.24.17 : TIMES embarques par trace.geojson (build_daily v5.2.45)
     // - necessaires a la sonde croisee classique (carte <-> profil).
     for (const t of traces)
@@ -3554,9 +3578,9 @@ async function load() {
     // v5.17.1 : profil.json au BOOT pour le badge km (variable kmData
     // dediee : le panneau alti garde son chargement differe profilData
     // et la construction de ses puces de dates).
-    try { const pj = await (await fetch(BASE + "/profil.json?v=" + Date.now())).json();
-          kmData = pj.km || null; srcData = pj.src || null; }   // v5.24 : src = part garmin (0..1) par date
-    catch (e) { kmData = null; }
+    const pj = await profilPr;   // v5.25.5 : fetch parallele lance plus haut
+    kmData = (pj && pj.km) || null;
+    srcData = (pj && pj.src) || null;   // v5.24 : src = part garmin (0..1) par date
     if (media.length) {
       let n = 90, s = -90, w = 180, e = -180;
       for (const m of media) { n = Math.max(n, m.lat); s = Math.min(s, m.lat); w = Math.min(w, m.lon); e = Math.max(e, m.lon); }
@@ -3573,7 +3597,7 @@ async function load() {
     render();
     // commentaires : la page lit photos.csv en direct (source de verite),
     // puis ouvre la galerie sur la journee la plus RECENTE
-    await loadComments();
+    await comPr;   // v5.25.5 : lance en parallele des le debut du boot
     buildDateMenu();
     if (media.length) {
       const lastDate = [...new Set(media.map(m => m.date))].sort().pop();
@@ -3701,7 +3725,8 @@ function dismissHome() {
 // points HORODATES des traces : point jaune + heure sur la carte,
 // curseur vertical sur la courbe alti (drawProfil(false) suit).
 // Boucle tant que l'accueil reste affichee et le player actif.
-let homePlay = null, homePlayPts = null, homePlayIdx = 0;
+let homePlay = null, homePlayPts = null, homePlayIdx = 0,
+    homePlayCum = null, homePlayDist = 0;   // v5.25.5 : cumul distance + curseur distance
 function homePlayBuild() {
   const pts = [];
   for (const tr of traces) {
@@ -3712,6 +3737,19 @@ function homePlayBuild() {
       pts.push({ t: ts[i], lon: cs[i][0], lat: cs[i][1] });
   }
   pts.sort((a, b) => a.t - b.t);
+  // v5.25.5 : distance CUMULEE (metres) par point - sert a la vitesse
+  // UNIFORME du curseur. Les sauts entre voyages (> 5 km d un point
+  // au suivant) sont exclus du cumul : le curseur se teleporte sans
+  // consommer de temps de lecture.
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) {
+    const dx = (pts[i].lon - pts[i - 1].lon)
+               * Math.cos(pts[i].lat * Math.PI / 180);
+    const dy = pts[i].lat - pts[i - 1].lat;
+    const d = 111320 * Math.sqrt(dx * dx + dy * dy);
+    cum.push(cum[i - 1] + (d > 5000 ? 0 : d));
+  }
+  homePlayCum = cum;
   return pts;
 }
 function homePlayToggle() {
@@ -3721,12 +3759,20 @@ function homePlayToggle() {
   if (!homePlayPts.length) return;
   const bp = document.getElementById("homePlayBtn");
   if (bp) { bp.innerHTML = "&#9208;"; bp.classList.add("on"); }
-  // ~15 s pour tout le voyage : pas = ceil(nbPoints / 75), tick 200 ms
-  const pas = Math.max(1, Math.ceil(homePlayPts.length / 75));
+  // v5.25.5 : VITESSE UNIFORME - le curseur avance d une DISTANCE
+  // constante par tick (basee sur homePlayCum), ~15 s pour tout le
+  // voyage. Avant, le pas etait un nombre de POINTS fixe : les
+  // traces peu denses (1er voyage) defilaient trop vite, les
+  // denses (voyages suivants) trop lentement.
+  const tot = homePlayCum ? homePlayCum[homePlayCum.length - 1] : 0;
+  const vm = tot > 0 ? tot / 75 : 0;   // metres par tick (75 x 200 ms = 15 s)
+  homePlayDist = 0; homePlayIdx = 0;
   homePlay = setInterval(() => {
     if (!document.getElementById("homeP")) { homePlayStop(); return; }
-    homePlayIdx += pas;
-    if (homePlayIdx >= homePlayPts.length) homePlayIdx = 0;
+    homePlayDist += vm;
+    if (homePlayDist >= tot) { homePlayDist = 0; homePlayIdx = 0; }
+    while (homePlayIdx < homePlayCum.length - 1
+           && homePlayCum[homePlayIdx] < homePlayDist) homePlayIdx++;
     const p = homePlayPts[homePlayIdx];
     classicProbe = { t: p.t, lon: p.lon, lat: p.lat };
     renderClassicProbe();
@@ -3735,6 +3781,7 @@ function homePlayToggle() {
 }
 function homePlayStop() {
   if (homePlay) { clearInterval(homePlay); homePlay = null; }
+  homePlayDist = 0; homePlayIdx = 0;   // v5.25.5 : chaque lecture repart du debut
   const bp = document.getElementById("homePlayBtn");
   if (bp) { bp.innerHTML = "&#9654;"; bp.classList.remove("on"); }
 }
