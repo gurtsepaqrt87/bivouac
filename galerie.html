@@ -1,6 +1,32 @@
 <!doctype html>
 <html lang="fr">
-<!-- VERSION v5.25.1 : chercher "v5.25" (Ctrl+U, Ctrl+F).
+<!-- VERSION v5.25.4 : chercher "v5.25" (Ctrl+U, Ctrl+F).
+     v5.25.4 = RETOURS 03/11 : (1) la ligne "Accueil : 1 tap pour
+     figer, 2 tap pour quitter la page" (et sa version laptop
+     "1er/2nd clic") passe en VERT CLAIR (#7CFC00, classe gFreeze)
+     au lieu du jaune, pour une meilleure visibilite - les autres
+     libelles du guide restent jaunes. (2) FIX TRACES GPS : a
+     l'ouverture de l'accueil les tracés n'apparaissaient qu'apres
+     un toucher de la carte - le 1er rendu (fitAllDays) partait
+     avec prDates VIDE = fenetre VIDE dans traceWindow (= tout
+     masquer, v5.24.52) ; les dates sont desormais TOUTES cochees
+     (prManual + syncPrDates) AVANT fitAllDays().
+     v5.25.3 = ACCUEIL EPURE + FILM MANUEL (demande 03/11, vues share
+     ET admin, phase accueil uniquement) : (1) la ligne "Accueil : 1
+     tap pour figer, 2 tap pour quitter la page" du guide passe en
+     JAUNE (toute la ligne en gras -> #ffd60a). (2) CARTE : pendant
+     l'accueil, les POINTEURS PHOTOS sont MASQUES - TRACES GPX
+     seules (renderMarkers retourne vide si homeP affichee). (3) le
+     film d'accueil n'est PLUS AUTOMATIQUE (v5.24.40/41 supprimees) :
+     bouton &#9654;/&#9208; (homePlayBtn) a droite de la ligne "Carte
+     ou altimetrie" du guide - lecture lancee/arretee UNIQUEMENT a la
+     main ; UN SEUL CURSEUR (classicProbe) balaie les points
+     HORODATES des traces : point jaune + heure sur la carte ET
+     curseur vertical sur la courbe alti (drawProfil(false) suit),
+     boucle tant que l'accueil reste affichee et le player actif.
+     (4) ALTI : les puces de dates ne s'affichent que 3 s a l'ouverture
+     (chipsFlash(3000)) puis l'altimetrie globale prend la place.
+     Le retour nominal (12 s, 1 tap fige, 2 tap quitte) est INCHANGE.
      v5.25.2 = FIX 3F ECRASEE (retour 31/10) : la branche .alti (2F
      photo+alti) pose des styles INLINE sur le panneau photo
      (flex:none + height:px, portrait -> photo ~78% ecran, voulu en
@@ -623,6 +649,16 @@
   #homeP .guide,.homeCard .guide{color:#8a94b0;font-size:13.5px;
     line-height:1.75;text-align:left;max-width:340px}
   #homeP .guide b,.homeCard .guide b{color:#ffd60a;font-weight:700}
+  /* v5.25.3 : bouton PLAY du film d'accueil - dans le guide, a droite
+     de la ligne "Carte ou altimetrie". Lecture MANUELLE seule (le
+     balayage automatique v5.24.40/41 est supprime). */
+  #homePlayBtn{display:inline-flex;align-items:center;justify-content:center;width:46px;height:34px;margin-left:12px;border-radius:9px;border:2px solid #b35300;background:#ff7a00;color:#fff;font-size:15px;cursor:pointer;vertical-align:middle}
+  #homePlayBtn:hover{background:#ffa040}
+  #homePlayBtn.on{background:#2d6a4f;border-color:#40916c}
+  /* v5.25.4 : ligne "figer/quitter" du guide en VERT CLAIR (retour
+     03/11 - le jaune etait peu visible). Les autres libelles
+     restent jaunes. */
+  #homeP .guide b.gFreeze{color:#7CFC00}
   #homeP svg{height:86px;max-width:220px}
   #homeP.frozen{outline:3px solid #ffd60a;outline-offset:-3px}   /* fige */
   /* v5.24.42 : pastille CADENCE de lecture (retour 1/2/3 taps) */
@@ -1481,13 +1517,13 @@ function renderClassicProbe() {
 // de la version smartphone (pas de glisses : souris/clavier).
 function homeGuideLaptopHTML() {
   return '<div class="guide">'
-    + '<b>Accueil</b> : 1er clic pour figer, 2nd clic pour quitter la page<br>'
+    + '<b class="gFreeze">Accueil : 1er clic pour figer, 2nd clic pour quitter la page</b><br>'
     + '<b>Galerie</b> : s&eacute;lection des dates avec le bouton<br>'
     + '&nbsp;&nbsp;D&eacute;fil&eacute; manuel avec les fl&egrave;ches gauche/droite<br>'
     + '&nbsp;&nbsp;Lecture continue : clic = On/Off ; double clic = +1 s ;'
     + ' triple clic = &minus;1 s<br>'
     + '<b>Carte</b> : zoom avec les boutons +/&#8722; ou avec la molette de la souris<br>'
-    + '<b>Carte ou altim&eacute;trie</b> :<br>'
+    + '<b>Carte ou altim&eacute;trie</b> <button id="homePlayBtn" title="Lancer ou arreter la lecture du voyage">&#9654;</button><br>'
     + '&nbsp;&nbsp;Simple clic : suivi horaire<br>'
     + '&nbsp;&nbsp;Double clic : affiche la photo la plus proche'
     + '</div>';
@@ -1495,12 +1531,12 @@ function homeGuideLaptopHTML() {
 function homeGuideHTML() {
   return '<div class="guide">'
     // v5.24.34 : guide mis a jour (figer/quitter, lecture continue)
-    + '<b>Accueil</b> : 1 tap pour figer, 2 tap pour quitter la page<br>'
+    + '<b class="gFreeze">Accueil : 1 tap pour figer, 2 tap pour quitter la page</b><br>'
     + '<b>Galerie</b> : gliss&eacute; droite/gauche pour d&eacute;filement'
     + ' manuel<br>'
     + '&nbsp;&nbsp;tap : On/Off de la lecture continue<br>'
     + '&nbsp;&nbsp;double tap : cadence +1 s ; triple tap : &minus;1 s<br>'
-    + '<b>Carte ou altim&eacute;trie</b> :<br>'
+    + '<b>Carte ou altim&eacute;trie</b> <button id="homePlayBtn" title="Lancer ou arreter la lecture du voyage">&#9654;</button><br>'
     + '&nbsp;&nbsp;Simple tap : suivi horaire parcours/alti<br>'
     + '&nbsp;&nbsp;Double tap : affiche la photo la plus proche<br>'
     + '<b>Altim&eacute;trie</b> :<br>'
@@ -1726,6 +1762,14 @@ function circleSVG(color) {
 }
 function renderMarkers() {
   marks.forEach(m => m.el.remove()); marks = [];
+  // v5.25.3 : ACCUEIL = TRACES GPX SEULES (demande 03/11) - les
+  // pointeurs photos sont masques tant que la page d'accueil est
+  // affichee ; le seul pointeur est le curseur jaune du player
+  // manuel (classicProbe). La pastille heure est purgee aussi.
+  if (document.getElementById("homeP")) {
+    if (mkHourEl) { mkHourEl.remove(); mkHourEl = null; }
+    return;
+  }
   // v5.24.48 : MEME FENETRE ±3 JOURS que les traces (retour du
   // 25/10) - les pointeurs photo des journees hors plage etaient
   // restes affiches alors que leurs traces avaient disparu.
@@ -3552,14 +3596,19 @@ async function load() {
       // 12 s sinon -> restoreNominal() (photo recente + centrage +
       // graph de sa date, selections purgees).
       showHomePage(false);
-      fitAllDays();
-      homePlaybackStart();          // v5.24.40 : film d'accueil
+      // v5.25.4 : FIX TRACES - cocher TOUTES les dates AVANT
+      // fitAllDays() : le 1er rendu partait avec prDates VIDE =
+      // fenetre VIDE dans traceWindow (= tout masquer) et les
+      // tracés GPX n'apparaissaient qu'apres le 1er toucher de
+      // la carte (le 2e rendu, lui, voyait les dates cochees).
       const allDatesM = profilData ? Object.keys(profilData.dates) : [];
       if (allDatesM.length) {
         prManual = new Set(allDatesM);
         prTouched = true;
-        syncPrDates(); drawProfil();
+        syncPrDates();
       }
+      fitAllDays();
+      if (allDatesM.length) drawProfil();
     } else {
       // v5.24.36/37 (retour 21/10) : LAPTOP - alti ACTIVEE par defaut
       // + PAGE D'ACCUEIL 'version laptop' dans la galerie (1er clic
@@ -3570,14 +3619,18 @@ async function load() {
       await openProfil();
       centerActive();
       showHomePage(true);
-      fitAllDays();
-      homePlaybackStart();          // v5.24.40 : film d'accueil
+      // v5.25.4 : FIX TRACES - cocher TOUTES les dates AVANT
+      // fitAllDays() (cf. branche smartphone ci-dessus : sans
+      // cela, fenetre VIDE dans traceWindow -> aucun trace GPX
+      // avant le 1er toucher de la carte).
       const allDates = profilData ? Object.keys(profilData.dates) : [];
       if (allDates.length) {
         prManual = new Set(allDates);
         prTouched = true;
-        syncPrDates(); drawProfil();
+        syncPrDates();
       }
+      fitAllDays();
+      if (allDates.length) drawProfil();
     }
   } catch (e) { fail(e.message); }
 }
@@ -3638,35 +3691,52 @@ function dismissHome() {
   document.getElementById("homeP").remove();
   clearTimeout(homeTimer);
   homeFrozen = false;             // v5.24.34 : reinitialiser le gel
-  homePlaybackStop();             // v5.24.40 : couper le film d'accueil
+  homePlayStop(); classicProbe = null; renderClassicProbe();   // v5.25.3 : couper le player + retirer le curseur
   restoreNominal();
 }
-// v5.24.40/41 : LECTURE TEMPORELLE RAPIDE pendant l'accueil (retour
-// 21/10, smartphone ET laptop) : le curseur photo balaie TOUT le
-// voyage - la carte suit (centrage) et l'alti affiche le curseur au
-// fil des heures. v5.24.41 : d'abord une PAUSE de 3 s (vue d'ensemble
-// du voyage, carte dezoomee + alti toutes dates), PUIS defilement
-// tres rapide qui boucle tout le voyage en 9 s ; le balayage
-// CONTINUE (en boucle) tant que la page d'accueil reste affichee
-// (y compris figee), jusqu'a la sortie.
-let homePlay = null, homePlayDelay = null;
-function homePlaybackStart() {
-  if (homePlay || homePlayDelay || !media.length) return;
-  homePlayDelay = setTimeout(() => {        // v5.24.41 : pause 3 s
-    homePlayDelay = null;
-    const pas = Math.max(1, Math.ceil(media.length / 30));  // 9 s : 30 ticks
-    homePlay = setInterval(() => {
-      if (!document.getElementById("homeP")) { homePlaybackStop(); return; }
-      let i = sel + pas;
-      if (i >= media.length) i = 0;         // boucle tant que l'accueil est affiche
-      openGal(i);          // curseur : carte + alti suivent (galerie couverte)
-      centerActive();
-    }, 300);
-  }, 3000);
+// v5.25.3 : FILM D'ACCUEIL MANUEL (demande 03/11) - les fonctions
+// v5.24.40/41 (balayage AUTOMATIQUE de la galerie) sont REMPLACEES :
+// la lecture n'est lancee ou arretee QUE par le bouton &#9654;/&#9208;
+// du guide (homePlayBtn). UN SEUL CURSEUR (classicProbe) balaie les
+// points HORODATES des traces : point jaune + heure sur la carte,
+// curseur vertical sur la courbe alti (drawProfil(false) suit).
+// Boucle tant que l'accueil reste affichee et le player actif.
+let homePlay = null, homePlayPts = null, homePlayIdx = 0;
+function homePlayBuild() {
+  const pts = [];
+  for (const tr of traces) {
+    const ts = tr.times; if (!ts) continue;
+    const cs = tr.geometry ? tr.geometry.coordinates : null;
+    if (!cs) continue;
+    for (let i = 0; i < ts.length && i < cs.length; i++)
+      pts.push({ t: ts[i], lon: cs[i][0], lat: cs[i][1] });
+  }
+  pts.sort((a, b) => a.t - b.t);
+  return pts;
 }
-function homePlaybackStop() {
-  if (homePlayDelay) { clearTimeout(homePlayDelay); homePlayDelay = null; }
+function homePlayToggle() {
+  if (homePlay) { homePlayStop(); return; }
+  if (!document.getElementById("homeP")) return;
+  if (!homePlayPts) homePlayPts = homePlayBuild();
+  if (!homePlayPts.length) return;
+  const bp = document.getElementById("homePlayBtn");
+  if (bp) { bp.innerHTML = "&#9208;"; bp.classList.add("on"); }
+  // ~15 s pour tout le voyage : pas = ceil(nbPoints / 75), tick 200 ms
+  const pas = Math.max(1, Math.ceil(homePlayPts.length / 75));
+  homePlay = setInterval(() => {
+    if (!document.getElementById("homeP")) { homePlayStop(); return; }
+    homePlayIdx += pas;
+    if (homePlayIdx >= homePlayPts.length) homePlayIdx = 0;
+    const p = homePlayPts[homePlayIdx];
+    classicProbe = { t: p.t, lon: p.lon, lat: p.lat };
+    renderClassicProbe();
+    drawProfil(false);
+  }, 200);
+}
+function homePlayStop() {
   if (homePlay) { clearInterval(homePlay); homePlay = null; }
+  const bp = document.getElementById("homePlayBtn");
+  if (bp) { bp.innerHTML = "&#9654;"; bp.classList.remove("on"); }
 }
 // v5.24.37 : retour au MODE CLASSIQUE apres l'accueil (laptop comme
 // mobile) - 1re photo de la journee la plus RECENTE ayant un media,
@@ -3701,6 +3771,15 @@ function showHomePage(laptop) {
     } else dismissHome();
   };
   document.getElementById("side").appendChild(d);
+  // v5.25.3 : bouton PLAY (lecture manuelle du voyage) - stopPropagation
+  // sinon le tap figerait l'accueil au lieu de jouer. Puces de dates
+  // limitees a 3 s puis altimetrie globale.
+  const hpb = d.querySelector("#homePlayBtn");
+  if (hpb) hpb.addEventListener("click", e => {
+    e.stopPropagation();
+    homePlayToggle();
+  });
+  chipsFlash(3000);
   homeTimer = setTimeout(dismissHome, 12000);
 }
 // v5.17 : polling du live toutes les 30 s (cache-busting comme photos.csv)
