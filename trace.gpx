@@ -107923,4 +107923,4 @@
         <ele>38.59999847412109375</ele>
         <time>2026-10-30T15:20:27.000Z</time>
         
-      </trkpt><trkpt lat="48.1023177" lon="-1.6623702"><ele>88.69999694824219</ele><time>2026-11-04T07:04:35.864Z</time><src>fused</src></trkpt><trkpt lat="48.1023846" lon="-1.6624174"><ele>97.19999694824219</ele><time>2026-11-04T17:52:46.563Z</time><src>fused</src></trkpt></trkseg></trk></gpx>
+      </trkpt><trkpt lat="48.1023177" lon="-1.6623702"><ele>88.69999694824219</ele><time>2026-11-04T07:04:35.864Z</time><src>fused</src></trkpt><trkpt lat="48.1023846" lon="-1.6624174"><ele>97.19999694824219</ele><time>2026-11-04T17:52:46.563Z</time><src>fused</src></trkpt><trkpt lat="48.1023784" lon="-1.6624117"><ele>97.19999694824219</ele><time>2026-11-04T23:21:28.592Z</time><src>network</src></trkpt></trkseg></trk></gpx>
