@@ -1,13 +1,21 @@
 <!doctype html>
 <html lang="fr">
 <!-- VERSION v5.25.6 : chercher "v5.25" (Ctrl+U, Ctrl+F).
-     v5.25.6 = RETOUR 06/11 : MENU DE DATES INVERSE - le bouton
-     orange (barre du haut, rappel par la poignee) affiche
-     desormais les journees les plus RECENTES en HAUT de la
-     liste ; avant, l ordre chronologique mettait la plus ancienne
-     en haut et il fallait defiler jusqu en bas pour atteindre
-     les dernieres sorties. La journee selectionnee par defaut
-     reste la plus recente (desormais 1re de la liste).
+     v5.25.7 = RETOUR 08/11 : PLAYER D ACCUEIL - pause puis REPRISE
+     au meme endroit. Avant, chaque appui sur &#9654; repartait du
+     debut (reinit homePlayDist/homePlayIdx dans homePlayToggle ET
+     homePlayStop) : incoherent apres une pause. Desormais :
+     - homePlayStop() = PAUSE : le curseur garde sa position ;
+     - homePlayToggle() ne reinitialise plus rien : la lecture
+     REPREND la ou elle s etait arretee ;
+     - QUITTER l accueil (dismissHome) remet le curseur au debut
+     (nouvelle session de lecture).
+     v5.25.6 = SELECTEUR DE DATES INVERSE (05/11) : le bouton date
+     (orange, haut gauche) affiche desormais les journees LES PLUS
+     RECENTES EN HAUT de la liste (avant : tri croissant, les plus
+     anciennes en tete - retour utilisateur). La date par defaut
+     reste la plus recente ; l option "Direct" (mode live) reste
+     ajoutee en fin de liste.
      v5.25.5 = RETOURS 04/11 : (1) BOOT RAPIDE - photos, videos,
      traces, profil et commentaires charges EN PARALLELE (avant :
      5 allers-retours sequentiels -> la page d accueil n apparais-
@@ -2486,7 +2494,8 @@ bindVerticalSwipe(mediaEl);
 
 // ---------- menu Date (journees ayant des donnees) ----------
 function buildDateMenu() {
-  const dates = [...new Set(media.map(m => m.date).filter(Boolean))].sort().reverse();   // v5.25.6 : recentes en haut
+  // v5.25.6 : les journees les plus RECENTES en HAUT du selecteur
+  const dates = [...new Set(media.map(m => m.date).filter(Boolean))].sort().reverse();
   const dSel = document.getElementById("btDate");
   dSel.innerHTML = "";
   for (const d of dates) {
@@ -2494,7 +2503,7 @@ function buildDateMenu() {
     o.value = d; o.textContent = d;
     dSel.appendChild(o);
   }
-  if (dates.length) dSel.value = dates[0];   // v5.25.6 : la plus recente = 1re de la liste inversee
+  if (dates.length) dSel.value = dates[0];   // la plus recente par defaut (v5.25.6 : en tete)
 }
 document.getElementById("btDate").addEventListener("change", e => {
   if (e.target.value === "__live__") return;   // v5.23 : option Direct (pas une date)
@@ -3723,6 +3732,7 @@ function dismissHome() {
   clearTimeout(homeTimer);
   homeFrozen = false;             // v5.24.34 : reinitialiser le gel
   homePlayStop(); classicProbe = null; renderClassicProbe();   // v5.25.3 : couper le player + retirer le curseur
+  homePlayDist = 0; homePlayIdx = 0;   // v5.25.7 : quitter l accueil = remise a zero (nouvelle session)
   restoreNominal();
 }
 // v5.25.3 : FILM D'ACCUEIL MANUEL (demande 03/11) - les fonctions
@@ -3773,7 +3783,9 @@ function homePlayToggle() {
   // denses (voyages suivants) trop lentement.
   const tot = homePlayCum ? homePlayCum[homePlayCum.length - 1] : 0;
   const vm = tot > 0 ? tot / 75 : 0;   // metres par tick (75 x 200 ms = 15 s)
-  homePlayDist = 0; homePlayIdx = 0;
+  // v5.25.7 : PAS de reinit ici - on REPREND la ou la pause s est
+  // arretee (homePlayDist/homePlayIdx conserves par homePlayStop).
+  // Premier demarrage : valeurs 0 par initialisation.
   homePlay = setInterval(() => {
     if (!document.getElementById("homeP")) { homePlayStop(); return; }
     homePlayDist += vm;
@@ -3788,7 +3800,9 @@ function homePlayToggle() {
 }
 function homePlayStop() {
   if (homePlay) { clearInterval(homePlay); homePlay = null; }
-  homePlayDist = 0; homePlayIdx = 0;   // v5.25.5 : chaque lecture repart du debut
+  // v5.25.7 : PAUSE - on NE remet PAS a zero : le prochain &#9654;
+  // reprend au meme endroit. (La remise a zero se fait en quittant
+  // l accueil, cf. dismissHome.)
   const bp = document.getElementById("homePlayBtn");
   if (bp) { bp.innerHTML = "&#9654;"; bp.classList.remove("on"); }
 }
