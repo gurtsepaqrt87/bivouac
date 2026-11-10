@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="fr">
 <!-- VERSION v5.25.6 : chercher "v5.25" (Ctrl+U, Ctrl+F).
+     v5.25.8 = RETOUR 10/11 : JOURNEE SANS TRACE (screenshots
+     Navigateur ajoutes sans activite GPS) : (1) photoEpoch lit aussi
+     les noms Screenshot_YYYYMMDD-HHMMSS (avant : null -> glisse des
+     jours et curseur alti ignoraient ces medias) ; (2) le selecteur
+     de dates RECENTRE la carte sur le media ouvert (openGal seul ne
+     recentrait qu en mode admin ou 3 fenetres - sur une journee sans
+     trace, le pointeur restait hors champ).
      v5.25.7 = RETOUR 08/11 : PLAYER D ACCUEIL - pause puis REPRISE
      au meme endroit. Avant, chaque appui sur &#9654; repartait du
      debut (reinit homePlayDist/homePlayIdx dans homePlayToggle ET
@@ -2508,7 +2515,10 @@ function buildDateMenu() {
 document.getElementById("btDate").addEventListener("change", e => {
   if (e.target.value === "__live__") return;   // v5.23 : option Direct (pas une date)
   const i = media.findIndex(m => m.date === e.target.value);
-  if (i >= 0) openGal(i);
+  // v5.25.8 : RECENTRER la carte sur le media ouvert - journee sans
+  // trace (screenshots Navigateur sans GPX), openGal seul ne recentre
+  // qu en mode admin ou 3 fenetres : le pointeur restait hors champ.
+  if (i >= 0) { openGal(i); centerActive(); }
 });
 // ---------- altimetrie (v5.14) : panneau profil + curseur photo ----------
 // Donnees : profil.json {dates:{jour:[[epoch_s, ele],...]}} genere par
@@ -2548,7 +2558,17 @@ function photoEpoch(m) {
   // en ete francais -> curseur decale a droite puis disparait sur les
   // 2 dernieres heures de la journee (hors trace).
   const mt = (m.name || "").match(/(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})/);
-  return mt ? new Date(+mt[1], +mt[2] - 1, +mt[3], +mt[4], +mt[5], +mt[6]).getTime() : null;
+  if (mt) return new Date(+mt[1], +mt[2] - 1, +mt[3], +mt[4], +mt[5], +mt[6]).getTime();
+  // v5.25.8 : screenshots Navigateur (Screenshot_20261110-121925_
+  // Navigateur.jpg) - sans ce repli, glisse des jours et curseur
+  // alti ignoraient ces medias (photoEpoch = null).
+  const st = (m.name || "").match(/(\d{8})-(\d{6})/);
+  if (st) {
+    const d = st[1], t = st[2];
+    return new Date(+d.slice(0,4), +d.slice(4,6) - 1, +d.slice(6,8),
+                    +t.slice(0,2), +t.slice(2,4), +t.slice(4,6)).getTime();
+  }
+  return null;
 }
 async function toggleProfil() {
   // v5.15 : ouvert/ferme factorises (utilise aussi par la vue mobile)
